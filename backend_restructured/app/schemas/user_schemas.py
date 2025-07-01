@@ -48,7 +48,8 @@ class UserCreate(UserBase):
     password: str = Field(
         ...,
         min_length=8,
-        description="Password (minimum 8 characters)"
+        description="Password (minimum 8 characters)",
+        example="SecureP@ssw0rd"
     )
     
     @validator('password')
@@ -63,6 +64,9 @@ class UserCreate(UserBase):
         if not any(c.isdigit() for c in v):
             raise ValueError('Password must contain at least one digit')
         return v
+
+class UserCreateBulk(BaseModel):
+    users: List[UserCreate]
 
 class UserUpdate(BaseModel):
     """
@@ -147,17 +151,23 @@ class UserListResponse(BaseModel):
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of users per page")
     
-class PasswordChange(BaseModel):
+class PasswordResetRequest(BaseModel):
     """
-    Schema for password change requests.
-    
-    Contains current and new password for validation.
+    Schema for password reset requests.
     """
-    current_password: str = Field(..., description="Current password for verification")
+    email: EmailStr = Field(..., description="User's email address", example="john.doe@example.com")
+
+
+class PasswordReset(BaseModel):
+    """
+    Schema for resetting a password.
+    """
+    token: str = Field(..., description="Password reset token", example="some_long_reset_token")
     new_password: str = Field(
         ...,
         min_length=8,
-        description="New password (minimum 8 characters)"
+        description="New password (minimum 8 characters)",
+        example="NewSecureP@ssw0rd"
     )
     
     @validator('new_password')

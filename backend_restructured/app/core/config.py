@@ -25,6 +25,9 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # Next.js frontend
         "http://localhost:8000",  # FastAPI backend
     ]
+    OPENAI_API_KEY: str = "your-openai-api-key-here" # Replace with your actual OpenAI API key
+    SENDGRID_API_KEY: str = "your-sendgrid-api-key-here"
+    MAIL_FROM_EMAIL: str = "your-verified-sender-email@example.com"
 
     class Config:
         case_sensitive = True

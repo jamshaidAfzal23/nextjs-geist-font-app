@@ -18,6 +18,15 @@ class ProjectStatus(str, PyEnum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
 
+# Define valid project status transitions
+VALID_STATUS_TRANSITIONS = {
+    ProjectStatus.PLANNING: [ProjectStatus.IN_PROGRESS, ProjectStatus.ON_HOLD, ProjectStatus.CANCELLED],
+    ProjectStatus.IN_PROGRESS: [ProjectStatus.ON_HOLD, ProjectStatus.COMPLETED, ProjectStatus.CANCELLED],
+    ProjectStatus.ON_HOLD: [ProjectStatus.IN_PROGRESS, ProjectStatus.CANCELLED],
+    ProjectStatus.COMPLETED: [],  # No transitions from completed
+    ProjectStatus.CANCELLED: [],  # No transitions from cancelled
+}
+
 class ProjectPriority(str, PyEnum):
     """Enumeration of project priority levels."""
     LOW = "low"
@@ -115,11 +124,13 @@ class Project(Base):
         Integer, 
         ForeignKey("clients.id"), 
         nullable=False,
+        index=True,
         doc="ID of the client this project belongs to"
     )
     developer_id = Column(
         Integer, 
         ForeignKey("users.id"),
+        index=True,
         doc="ID of the developer assigned to this project"
     )
     
@@ -158,6 +169,12 @@ class Project(Base):
         back_populates="project",
         cascade="all, delete-orphan",
         doc="Payments received for this project"
+    )
+    milestones = relationship(
+        "ProjectMilestone",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        order_by="ProjectMilestone.due_date"
     )
     
     def __repr__(self) -> str:

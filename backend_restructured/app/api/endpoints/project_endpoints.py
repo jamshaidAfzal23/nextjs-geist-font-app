@@ -15,7 +15,7 @@ from ...models import Project, Client, User, Payment, Expense
 from ...models.project_model import ProjectStatus, ProjectPriority
 from ...schemas import (
     ProjectCreate, ProjectUpdate, ProjectResponse, ProjectListResponse,
-    ProjectSummary, ProjectSearchFilters, ProjectStats
+    ProjectSummary, ProjectSearchFilters, ProjectStats, ProjectCreateBulk, ProjectUpdateBulk, ProjectDeleteBulk
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -27,16 +27,6 @@ async def create_project(
 ):
     """
     Create a new project.
-    
-    Args:
-        project_data (ProjectCreate): Project creation data
-        db (Session): Database session
-        
-    Returns:
-        ProjectResponse: Created project information
-        
-    Raises:
-        HTTPException: If client or developer not found
     """
     # Verify client exists
     client = db.query(Client).filter(Client.id == project_data.client_id).first()
@@ -63,6 +53,114 @@ async def create_project(
     
     return db_project
 
+
+@router.post("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["projects:create"]))])
+async def create_multiple_projects(
+    projects_data: ProjectCreateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Create multiple project records in a single request.
+    """
+    created_projects = []
+    for project_data in projects_data.projects:
+        # Verify client exists
+        client = db.query(Client).filter(Client.id == project_data.client_id).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Client with ID {project_data.client_id} not found for project {project_data.title}"
+            )
+        
+        # Verify developer exists (if provided)
+        if project_data.developer_id:
+            developer = db.query(User).filter(User.id == project_data.developer_id).first()
+            if not developer:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Developer with ID {project_data.developer_id} not found for project {project_data.title}"
+                )
+        
+        db_project = Project(**project_data.dict())
+        db.add(db_project)
+        created_projects.append(db_project)
+    
+    db.commit()
+    for project in created_projects:
+        db.refresh(project)
+    
+    return created_projects
+
+
+@router.put("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["projects:update"]))])
+async def update_multiple_projects(
+    projects_data: ProjectUpdateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update multiple project records in a single request.
+    """
+    updated_projects = []
+    for project_data in projects_data.projects:
+        project = db.query(Project).filter(Project.id == project_data.id).first()
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project with ID {project_data.id} not found"
+            )
+        
+        # Verify developer exists (if being updated)
+        if project_data.developer_id:
+            developer = db.query(User).filter(User.id == project_data.developer_id).first()
+            if not developer:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Developer with ID {project_data.developer_id} not found for project {project.title}"
+                )
+        
+        # Validate status transition
+        if project_data.status and project_data.status != project.status:
+            if project_data.status not in VALID_STATUS_TRANSITIONS.get(project.status, []):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid status transition from {project.status} to {project_data.status}"
+                )
+
+        for field, value in project_data.dict(exclude_unset=True).items():
+            setattr(project, field, value)
+        
+        # Set actual_end_date if status is completed
+        if project_data.status == ProjectStatus.COMPLETED and not project.actual_end_date:
+            project.actual_end_date = datetime.now()
+        
+        updated_projects.append(project)
+    
+    db.commit()
+    for project in updated_projects:
+        db.refresh(project)
+    
+    return updated_projects
+
+
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["projects:delete"]))])
+async def delete_multiple_projects(
+    project_ids_data: ProjectDeleteBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Delete multiple project records in a single request.
+    """
+    for project_id in project_ids_data.project_ids:
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Project with ID {project_id} not found"
+            )
+        db.delete(project)
+    
+    db.commit()
+
 @router.get("/", response_model=ProjectListResponse)
 async def get_projects(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -73,24 +171,13 @@ async def get_projects(
     client_id: Optional[int] = Query(None, description="Filter by client ID"),
     developer_id: Optional[int] = Query(None, description="Filter by developer ID"),
     is_overdue: Optional[bool] = Query(None, description="Filter overdue projects"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'title', 'start_date', 'end_date')"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,title,status')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a paginated list of projects with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip for pagination
-        limit (int): Maximum number of records to return
-        search (str, optional): Search term for project title
-        status (ProjectStatus, optional): Filter by project status
-        priority (ProjectPriority, optional): Filter by project priority
-        client_id (int, optional): Filter by client ID
-        developer_id (int, optional): Filter by developer ID
-        is_overdue (bool, optional): Filter overdue projects
-        db (Session): Database session
-        
-    Returns:
-        ProjectListResponse: Paginated list of projects
+    Retrieve a paginated list of projects with optional filtering and sorting.
     """
     # Build query with filters
     query = db.query(Project)
@@ -120,37 +207,18 @@ async def get_projects(
             )
         )
     
-    # Get total count
-    total = query.count()
-    
-    # Apply pagination and load related data
-    projects = query.offset(skip).limit(limit).all()
-    
-    # Enhance projects with computed fields
-    enhanced_projects = []
-    for project in projects:
-        project_dict = project.__dict__.copy()
-        
-        # Add computed fields
-        project_dict['is_overdue'] = project.is_overdue
-        project_dict['total_expenses'] = project.total_expenses
-        project_dict['total_payments'] = project.total_payments
-        project_dict['profit_margin'] = project.profit_margin
-        
-        # Add related data
-        if project.client:
-            project_dict['client_name'] = project.client.company_name
-        if project.developer:
-            project_dict['developer_name'] = project.developer.full_name
-        
-        enhanced_projects.append(project_dict)
-    
-    return {
-        "projects": enhanced_projects,
-        "total": total,
-        "page": (skip // limit) + 1,
-        "per_page": limit
-    }
+    # Apply sorting
+    if sort_by:
+        if hasattr(Project, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Project, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Project, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(
@@ -232,6 +300,15 @@ async def update_project(
     
     # Update project fields
     update_data = project_data.dict(exclude_unset=True)
+
+    # Validate status transition
+    if "status" in update_data and update_data["status"] != project.status:
+        if update_data["status"] not in VALID_STATUS_TRANSITIONS.get(project.status, []):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status transition from {project.status} to {update_data['status']}"
+            )
+
     for field, value in update_data.items():
         setattr(project, field, value)
     

@@ -79,11 +79,15 @@ class Client(Base):
         String(100),
         doc="Preferred platform for projects (e.g., Web, Mobile, Desktop)"
     )
+    category = Column(
+        String(100),
+        doc="Client category (e.g., VIP, New, Strategic)"
+    )
     
     # Additional information
-    notes = Column(
+    general_notes = Column(
         Text,
-        doc="Additional notes, preferences, or important information about the client"
+        doc="General notes, preferences, or important information about the client"
     )
     
     # Foreign keys
@@ -91,6 +95,7 @@ class Client(Base):
         Integer, 
         ForeignKey("users.id"), 
         nullable=False,
+        index=True,
         doc="ID of the user responsible for managing this client"
     )
     
@@ -129,6 +134,18 @@ class Client(Base):
         "Payment", 
         back_populates="client",
         doc="All payments received from this client"
+    )
+    history = relationship(
+        "ClientHistory",
+        back_populates="client",
+        cascade="all, delete-orphan",
+        order_by="ClientHistory.timestamp.desc()"
+    )
+    notes_list = relationship(
+        "ClientNote",
+        back_populates="client",
+        cascade="all, delete-orphan",
+        order_by="ClientNote.created_at.desc()"
     )
     
     def __repr__(self) -> str:

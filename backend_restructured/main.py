@@ -47,6 +47,8 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down Smart CRM SaaS application...")
 
+from app.core.limiter import limiter
+
 # Create FastAPI application instance
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -57,6 +59,9 @@ app = FastAPI(
     openapi_url="/openapi.json",
     lifespan=lifespan
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Configure CORS middleware
 app.add_middleware(

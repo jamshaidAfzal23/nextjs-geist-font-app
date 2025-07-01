@@ -80,24 +80,12 @@ async def get_payments(
     client_id: Optional[int] = Query(None, description="Filter by client ID"),
     status: Optional[PaymentStatus] = Query(None, description="Filter by payment status"),
     date_from: Optional[datetime] = Query(None, description="Filter payments from this date"),
-    date_to: Optional[datetime] = Query(None, description="Filter payments to this date"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,amount,status')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a list of payments with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip
-        limit (int): Maximum number of records to return
-        project_id (int, optional): Filter by project ID
-        client_id (int, optional): Filter by client ID
-        status (PaymentStatus, optional): Filter by payment status
-        date_from (datetime, optional): Filter payments from this date
-        date_to (datetime, optional): Filter payments to this date
-        db (Session): Database session
-        
-    Returns:
-        List[PaymentResponse]: List of payments
+    Retrieve a list of payments with optional filtering, sorting, and field selection.
     """
     query = db.query(Payment)
     
@@ -116,19 +104,43 @@ async def get_payments(
     if date_to:
         query = query.filter(Payment.payment_date <= date_to)
     
+    # Apply sorting
+    if sort_by:
+        if hasattr(Payment, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Payment, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Payment, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
     payments = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_payments = []
+        for payment in payments:
+            payment_dict = payment.__dict__.copy()
+            filtered_payment = {k: v for k, v in payment_dict.items() if k in selected_fields}
+            processed_payments.append(filtered_payment)
+        payments = processed_payments
+    else:
+        # Enhance with related data
+        enhanced_payments = []
+        for payment in payments:
+            payment_dict = payment.__dict__.copy()
+            if payment.project:
+                payment_dict['project_title'] = payment.project.title
+            if payment.client:
+                payment_dict['client_name'] = payment.client.company_name
+            enhanced_payments.append(payment_dict)
+        payments = enhanced_payments
     
-    # Enhance with related data
-    enhanced_payments = []
-    for payment in payments:
-        payment_dict = payment.__dict__.copy()
-        if payment.project:
-            payment_dict['project_title'] = payment.project.title
-        if payment.client:
-            payment_dict['client_name'] = payment.client.company_name
-        enhanced_payments.append(payment_dict)
-    
-    return enhanced_payments
+    return payments
 
 @payment_router.get("/{payment_id}", response_model=PaymentResponse)
 async def get_payment(
@@ -250,23 +262,12 @@ async def get_expenses(
     created_by_id: Optional[int] = Query(None, description="Filter by user who created expense"),
     date_from: Optional[datetime] = Query(None, description="Filter expenses from this date"),
     date_to: Optional[datetime] = Query(None, description="Filter expenses to this date"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,title,amount')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a list of expenses with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip
-        limit (int): Maximum number of records to return
-        project_id (int, optional): Filter by project ID
-        category (ExpenseCategory, optional): Filter by expense category
-        created_by_id (int, optional): Filter by user who created expense
-        date_from (datetime, optional): Filter expenses from this date
-        date_to (datetime, optional): Filter expenses to this date
-        db (Session): Database session
-        
-    Returns:
-        List[ExpenseResponse]: List of expenses
+    Retrieve a list of expenses with optional filtering, sorting, and field selection.
     """
     query = db.query(Expense)
     
@@ -285,17 +286,212 @@ async def get_expenses(
     if date_to:
         query = query.filter(Expense.expense_date <= date_to)
     
+    # Apply sorting
+    if sort_by:
+        if hasattr(Expense, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Expense, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Expense, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
     expenses = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            filtered_expense = {k: v for k, v in expense_dict.items() if k in selected_fields}
+            processed_expenses.append(filtered_expense)
+        expenses = processed_expenses
+    else:
+        # Enhance with related data
+        enhanced_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            if expense.linked_project:
+                expense_dict['project_title'] = expense.linked_project.title
+            if expense.created_by_user:
+                expense_dict['created_by_name'] = expense.created_by_user.full_name
+            enhanced_expenses.append(expense_dict)
+        expenses = enhanced_expenses
     
-    # Enhance with related data
-    enhanced_expenses = []
-    for expense in expenses:
-        expense_dict = expense.__dict__.copy()
-        if expense.linked_project:
-            expense_dict['project_title'] = expense.linked_project.title
-        if expense.created_by_user:
-            expense_dict['created_by_name'] = expense.created_by_user.full_name
-        enhanced_expenses.append(expense_dict)
+    return enhanced_expenses
+    """
+    Retrieve a list of expenses with optional filtering, sorting, and field selection.
+    """
+    query = db.query(Expense)
+    
+    if project_id:
+        query = query.filter(Expense.linked_project_id == project_id)
+    
+    if category:
+        query = query.filter(Expense.category == category)
+    
+    if created_by_id:
+        query = query.filter(Expense.created_by_id == created_by_id)
+    
+    if date_from:
+        query = query.filter(Expense.expense_date >= date_from)
+    
+    if date_to:
+        query = query.filter(Expense.expense_date <= date_to)
+    
+    # Apply sorting
+    if sort_by:
+        if hasattr(Expense, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Expense, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Expense, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
+    expenses = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            filtered_expense = {k: v for k, v in expense_dict.items() if k in selected_fields}
+            processed_expenses.append(filtered_expense)
+        expenses = processed_expenses
+    else:
+        # Enhance with related data
+        enhanced_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            if expense.linked_project:
+                expense_dict['project_title'] = expense.linked_project.title
+            if expense.created_by_user:
+                expense_dict['created_by_name'] = expense.created_by_user.full_name
+            enhanced_expenses.append(expense_dict)
+        expenses = enhanced_expenses
+    
+    return enhanced_expenses
+    """
+    Retrieve a list of expenses with optional filtering, sorting, and field selection.
+    """
+    query = db.query(Expense)
+    
+    if project_id:
+        query = query.filter(Expense.linked_project_id == project_id)
+    
+    if category:
+        query = query.filter(Expense.category == category)
+    
+    if created_by_id:
+        query = query.filter(Expense.created_by_id == created_by_id)
+    
+    if date_from:
+        query = query.filter(Expense.expense_date >= date_from)
+    
+    if date_to:
+        query = query.filter(Expense.expense_date <= date_to)
+    
+    # Apply sorting
+    if sort_by:
+        if hasattr(Expense, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Expense, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Expense, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
+    expenses = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            filtered_expense = {k: v for k, v in expense_dict.items() if k in selected_fields}
+            processed_expenses.append(filtered_expense)
+        expenses = processed_expenses
+    else:
+        # Enhance with related data
+        enhanced_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            if expense.linked_project:
+                expense_dict['project_title'] = expense.linked_project.title
+            if expense.created_by_user:
+                expense_dict['created_by_name'] = expense.created_by_user.full_name
+            enhanced_expenses.append(expense_dict)
+        expenses = enhanced_expenses
+    
+    return enhanced_expenses
+    """
+    Retrieve a list of expenses with optional filtering, sorting, and field selection.
+    """
+    query = db.query(Expense)
+    
+    if project_id:
+        query = query.filter(Expense.linked_project_id == project_id)
+    
+    if category:
+        query = query.filter(Expense.category == category)
+    
+    if created_by_id:
+        query = query.filter(Expense.created_by_id == created_by_id)
+    
+    if date_from:
+        query = query.filter(Expense.expense_date >= date_from)
+    
+    if date_to:
+        query = query.filter(Expense.expense_date <= date_to)
+    
+    # Apply sorting
+    if sort_by:
+        if hasattr(Expense, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Expense, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Expense, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
+    expenses = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            filtered_expense = {k: v for k, v in expense_dict.items() if k in selected_fields}
+            processed_expenses.append(filtered_expense)
+        expenses = processed_expenses
+    else:
+        # Enhance with related data
+        enhanced_expenses = []
+        for expense in expenses:
+            expense_dict = expense.__dict__.copy()
+            if expense.linked_project:
+                expense_dict['project_title'] = expense.linked_project.title
+            if expense.created_by_user:
+                expense_dict['created_by_name'] = expense.created_by_user.full_name
+            enhanced_expenses.append(expense_dict)
+        expenses = enhanced_expenses
     
     return enhanced_expenses
 
@@ -370,6 +566,86 @@ async def create_invoice(
     
     return db_invoice
 
+
+@invoice_router.post("/bulk", response_model=List[InvoiceResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["invoices:create"]))])
+async def create_multiple_invoices(
+    invoices_data: InvoiceCreateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Create multiple invoice records in a single request.
+    """
+    created_invoices = []
+    for invoice_data in invoices_data.invoices:
+        client = db.query(Client).filter(Client.id == invoice_data.client_id).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Client with ID {invoice_data.client_id} not found for invoice"
+            )
+        existing_invoice = db.query(Invoice).filter(Invoice.invoice_number == invoice_data.invoice_number).first()
+        if existing_invoice:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invoice number {invoice_data.invoice_number} already exists"
+            )
+        db_invoice = Invoice(**invoice_data.dict())
+        db.add(db_invoice)
+        created_invoices.append(db_invoice)
+    
+    db.commit()
+    for invoice in created_invoices:
+        db.refresh(invoice)
+    
+    return created_invoices
+
+
+@invoice_router.put("/bulk", response_model=List[InvoiceResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["invoices:update"]))])
+async def update_multiple_invoices(
+    invoices_data: InvoiceUpdateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update multiple invoice records in a single request.
+    """
+    updated_invoices = []
+    for invoice_data in invoices_data.invoices:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_data.id).first()
+        if not invoice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Invoice with ID {invoice_data.id} not found"
+            )
+        for field, value in invoice_data.dict(exclude_unset=True).items():
+            setattr(invoice, field, value)
+        updated_invoices.append(invoice)
+    
+    db.commit()
+    for invoice in updated_invoices:
+        db.refresh(invoice)
+    
+    return updated_invoices
+
+
+@invoice_router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["invoices:delete"]))])
+async def delete_multiple_invoices(
+    invoice_ids_data: InvoiceDeleteBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Delete multiple invoice records in a single request.
+    """
+    for invoice_id in invoice_ids_data.invoice_ids:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        if not invoice:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Invoice with ID {invoice_id} not found"
+            )
+        db.delete(invoice)
+    
+    db.commit()
+
 @invoice_router.get("/", response_model=List[InvoiceResponse])
 async def get_invoices(
     skip: int = Query(0, ge=0),
@@ -377,21 +653,12 @@ async def get_invoices(
     client_id: Optional[int] = Query(None, description="Filter by client ID"),
     status: Optional[InvoiceStatus] = Query(None, description="Filter by invoice status"),
     overdue_only: Optional[bool] = Query(False, description="Show only overdue invoices"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,invoice_number,amount')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a list of invoices with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip
-        limit (int): Maximum number of records to return
-        client_id (int, optional): Filter by client ID
-        status (InvoiceStatus, optional): Filter by invoice status
-        overdue_only (bool): Show only overdue invoices
-        db (Session): Database session
-        
-    Returns:
-        List[InvoiceResponse]: List of invoices
+    Retrieve a list of invoices with optional filtering, sorting, and field selection.
     """
     query = db.query(Invoice)
     
@@ -408,35 +675,84 @@ async def get_invoices(
             Invoice.status != InvoiceStatus.PAID
         )
     
+    # Apply sorting
+    if sort_by:
+        if hasattr(Invoice, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Invoice, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Invoice, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
     invoices = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_invoices = []
+        for invoice in invoices:
+            invoice_dict = invoice.__dict__.copy()
+            filtered_invoice = {k: v for k, v in invoice_dict.items() if k in selected_fields}
+            processed_invoices.append(filtered_invoice)
+        invoices = processed_invoices
+    else:
+        # Enhance with computed fields
+        enhanced_invoices = []
+        for invoice in invoices:
+            invoice_dict = invoice.__dict__.copy()
+            if invoice.client:
+                invoice_dict['client_name'] = invoice.client.company_name
+            
+            # Calculate if overdue
+            current_date = datetime.now()
+            invoice_dict['is_overdue'] = (
+                invoice.due_date < current_date and 
+                invoice.status != InvoiceStatus.PAID
+            )
+            
+            # Calculate days until due
+            if invoice.due_date:
+                days_diff = (invoice.due_date - current_date).days
+                invoice_dict['days_until_due'] = days_diff
+            
+            enhanced_invoices.append(invoice_dict)
+        invoices = enhanced_invoices
     
-    # Enhance with computed fields
-    enhanced_invoices = []
-    for invoice in invoices:
-        invoice_dict = invoice.__dict__.copy()
-        if invoice.client:
-            invoice_dict['client_name'] = invoice.client.company_name
-        
-        # Calculate if overdue
-        current_date = datetime.now()
-        invoice_dict['is_overdue'] = (
-            invoice.due_date < current_date and 
-            invoice.status != InvoiceStatus.PAID
+    return invoices
+
+@invoice_router.get("/{invoice_id}/generate-pdf", status_code=status.HTTP_200_OK)
+async def generate_invoice_pdf(
+    invoice_id: int,
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Generate a PDF for a specific invoice.
+    """
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Invoice not found"
         )
-        
-        # Calculate days until due
-        if invoice.due_date:
-            days_diff = (invoice.due_date - current_date).days
-            invoice_dict['days_until_due'] = days_diff
-        
-        enhanced_invoices.append(invoice_dict)
     
-    return enhanced_invoices
+    # In a real application, you would use a PDF generation library (e.g., ReportLab, WeasyPrint)
+    # to create the PDF from invoice data.
+    # For now, this is a placeholder.
+    
+    return {"message": f"PDF generation for invoice {invoice_id} is not yet implemented."}
 
 # FINANCIAL ANALYTICS ENDPOINTS
 @financial_router.get("/stats", response_model=FinancialStats)
 async def get_financial_stats(
     year: Optional[int] = Query(None, description="Filter by year"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Filter by month"),
+    client_id: Optional[int] = Query(None, description="Filter by client ID"),
+    project_id: Optional[int] = Query(None, description="Filter by project ID"),
     db: Session = Depends(get_database_session)
 ):
     """
@@ -444,13 +760,20 @@ async def get_financial_stats(
     
     Args:
         year (int, optional): Filter statistics by year
+        month (int, optional): Filter statistics by month
+        client_id (int, optional): Filter by client ID
+        project_id (int, optional): Filter by project ID
         db (Session): Database session
         
     Returns:
         FinancialStats: Financial analytics and statistics
     """
     # Set date filters
-    if year:
+    if year and month:
+        start_date = datetime(year, month, 1)
+        end_date = datetime(year, month, 1) + timedelta(days=32) # Go to next month and subtract a day
+        end_date = end_date.replace(day=1) - timedelta(days=1)
+    elif year:
         start_date = datetime(year, 1, 1)
         end_date = datetime(year, 12, 31, 23, 59, 59)
     else:
@@ -459,20 +782,32 @@ async def get_financial_stats(
         start_date = datetime(current_year, 1, 1)
         end_date = datetime(current_year, 12, 31, 23, 59, 59)
     
+    # Base queries
+    payments_query = db.query(Payment).filter(
+        Payment.payment_date >= start_date,
+        Payment.payment_date <= end_date
+    )
+    expenses_query = db.query(Expense).filter(
+        Expense.expense_date >= start_date,
+        Expense.expense_date <= end_date
+    )
+    invoices_query = db.query(Invoice)
+
+    # Apply additional filters
+    if client_id:
+        payments_query = payments_query.filter(Payment.client_id == client_id)
+        expenses_query = expenses_query.filter(Expense.linked_project.has(client_id=client_id))
+        invoices_query = invoices_query.filter(Invoice.client_id == client_id)
+    
+    if project_id:
+        payments_query = payments_query.filter(Payment.project_id == project_id)
+        expenses_query = expenses_query.filter(Expense.linked_project_id == project_id)
+
     # Calculate total revenue
-    total_revenue = db.query(func.sum(Payment.amount))\
-        .filter(
-            Payment.status == PaymentStatus.COMPLETED,
-            Payment.payment_date >= start_date,
-            Payment.payment_date <= end_date
-        ).scalar() or 0.0
+    total_revenue = payments_query.filter(Payment.status == PaymentStatus.COMPLETED).with_entities(func.sum(Payment.amount)).scalar() or 0.0
     
     # Calculate total expenses
-    total_expenses = db.query(func.sum(Expense.amount))\
-        .filter(
-            Expense.expense_date >= start_date,
-            Expense.expense_date <= end_date
-        ).scalar() or 0.0
+    total_expenses = expenses_query.with_entities(func.sum(Expense.amount)).scalar() or 0.0
     
     # Calculate net profit and margin
     net_profit = total_revenue - total_expenses
@@ -480,36 +815,23 @@ async def get_financial_stats(
     
     # Revenue by month
     revenue_by_month = {}
-    monthly_revenue = db.query(
-        extract('month', Payment.payment_date).label('month'),
-        func.sum(Payment.amount).label('total')
-    ).filter(
-        Payment.status == PaymentStatus.COMPLETED,
-        Payment.payment_date >= start_date,
-        Payment.payment_date <= end_date
-    ).group_by(extract('month', Payment.payment_date)).all()
+    monthly_revenue = payments_query.filter(
+        Payment.status == PaymentStatus.COMPLETED
+    ).group_by(extract('month', Payment.payment_date)).with_entities(extract('month', Payment.payment_date).label('month'), func.sum(Payment.amount).label('total')).all()
     
-    for month, total in monthly_revenue:
-        month_name = datetime(2000, int(month), 1).strftime('%B')
+    for month_num, total in monthly_revenue:
+        month_name = datetime(2000, int(month_num), 1).strftime('%B')
         revenue_by_month[month_name] = float(total)
     
     # Expenses by category
     expenses_by_category = {}
-    category_expenses = db.query(
-        Expense.category,
-        func.sum(Expense.amount).label('total')
-    ).filter(
-        Expense.expense_date >= start_date,
-        Expense.expense_date <= end_date
-    ).group_by(Expense.category).all()
+    category_expenses = expenses_query.group_by(Expense.category).with_entities(Expense.category, func.sum(Expense.amount).label('total')).all()
     
     for category, total in category_expenses:
         expenses_by_category[category] = float(total)
     
     # Outstanding invoices
-    outstanding_invoices = db.query(func.sum(Invoice.amount))\
-        .filter(Invoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.OVERDUE]))\
-        .scalar() or 0.0
+    outstanding_invoices = invoices_query.filter(Invoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.OVERDUE])).with_entities(func.sum(Invoice.amount)).scalar() or 0.0
     
     # Average payment time (simplified calculation)
     avg_payment_time = None  # This would require more complex calculation

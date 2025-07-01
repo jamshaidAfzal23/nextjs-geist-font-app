@@ -76,12 +76,17 @@ class ProjectCreate(ProjectBase):
     """
     client_id: int = Field(
         ...,
-        description="ID of the client this project belongs to"
+        description="ID of the client this project belongs to",
+        example=1
     )
     developer_id: Optional[int] = Field(
         None,
-        description="ID of the developer assigned to this project"
+        description="ID of the developer assigned to this project",
+        example=2
     )
+
+class ProjectCreateBulk(BaseModel):
+    projects: List[ProjectCreate]
 
 class ProjectUpdate(BaseModel):
     """
@@ -134,6 +139,12 @@ class ProjectUpdate(BaseModel):
         None,
         description="Updated assigned developer ID"
     )
+
+class ProjectUpdateBulk(BaseModel):
+    projects: List[ProjectUpdate]
+
+class ProjectDeleteBulk(BaseModel):
+    project_ids: List[int]
 
 class ProjectResponse(ProjectBase):
     """
@@ -288,10 +299,10 @@ class ProjectMilestone(BaseModel):
     
     Represents important dates and deliverables within a project.
     """
-    id: Optional[int] = Field(None, description="Milestone ID")
-    project_id: int = Field(..., description="Associated project ID")
-    title: str = Field(..., max_length=200, description="Milestone title")
-    description: Optional[str] = Field(None, description="Milestone description")
-    due_date: datetime = Field(..., description="Milestone due date")
-    is_completed: bool = Field(default=False, description="Whether milestone is completed")
-    completion_date: Optional[datetime] = Field(None, description="When milestone was completed")
+    id: Optional[int] = Field(None, description="Milestone ID", example=1)
+    project_id: int = Field(..., description="Associated project ID", example=1)
+    title: str = Field(..., max_length=200, description="Milestone title", example="Phase 1 Completion")
+    description: Optional[str] = Field(None, description="Milestone description", example="Complete the initial design and wireframes.")
+    due_date: datetime = Field(..., description="Milestone due date", example="2023-04-15T17:00:00Z")
+    is_completed: bool = Field(default=False, description="Whether milestone is completed", example=False)
+    completion_date: Optional[datetime] = Field(None, description="When milestone was completed", example="2023-04-14T16:00:00Z")

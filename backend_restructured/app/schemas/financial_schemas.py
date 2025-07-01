@@ -37,6 +37,16 @@ class PaymentBase(BaseModel):
         max_length=255,
         description="External payment system reference"
     )
+    payment_gateway_id: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="ID from the payment gateway (e.g., Stripe charge ID)"
+    )
+    currency: str = Field(
+        "USD",
+        max_length=3,
+        description="Currency of the payment (e.g., USD, EUR)"
+    )
     notes: Optional[str] = Field(
         None,
         max_length=1000,
@@ -45,9 +55,11 @@ class PaymentBase(BaseModel):
 
 class PaymentCreate(PaymentBase):
     """Schema for creating a new payment."""
-    project_id: int = Field(..., description="Associated project ID")
-    client_id: int = Field(..., description="Client who made the payment")
-    payment_date: Optional[datetime] = Field(None, description="When payment was made")
+    project_id: int = Field(..., description="Associated project ID", example=1)
+    client_id: int = Field(..., description="Client who made the payment", example=1)
+    payment_date: Optional[datetime] = Field(None, description="When payment was made", example="2023-03-15T10:00:00Z")
+    payment_gateway_id: Optional[str] = Field(None, description="ID from the payment gateway", example="ch_456def")
+    currency: str = Field("USD", description="Currency of the payment (e.g., USD, EUR)", example="USD")
 
 class PaymentUpdate(BaseModel):
     """
@@ -59,6 +71,8 @@ class PaymentUpdate(BaseModel):
     status: Optional[PaymentStatus] = None
     method: Optional[PaymentMethod] = None
     transaction_id: Optional[str] = Field(None, max_length=255)
+    payment_gateway_id: Optional[str] = Field(None, max_length=255)
+    currency: Optional[str] = Field(None, max_length=3)
     notes: Optional[str] = Field(None, max_length=1000)
     payment_date: Optional[datetime] = None
 
@@ -68,6 +82,8 @@ class PaymentResponse(PaymentBase):
     project_id: int = Field(..., description="Associated project ID")
     client_id: int = Field(..., description="Client who made the payment")
     payment_date: Optional[datetime] = Field(None, description="Payment date")
+    payment_gateway_id: Optional[str] = Field(None, description="ID from the payment gateway")
+    currency: Optional[str] = Field(None, description="Currency of the payment")
     created_at: datetime
     updated_at: datetime
     
@@ -200,6 +216,9 @@ class InvoiceCreate(InvoiceBase):
             raise ValueError('Due date must be after issue date')
         return v
 
+class InvoiceCreateBulk(BaseModel):
+    invoices: List[InvoiceCreate]
+
 class InvoiceUpdate(BaseModel):
     """
     Schema for updating invoice information.
@@ -213,20 +232,26 @@ class InvoiceUpdate(BaseModel):
     due_date: Optional[datetime] = None
     paid_date: Optional[datetime] = None
 
+class InvoiceUpdateBulk(BaseModel):
+    invoices: List[InvoiceUpdate]
+
+class InvoiceDeleteBulk(BaseModel):
+    invoice_ids: List[int]
+
 class InvoiceResponse(InvoiceBase):
     """Schema for invoice data in API responses."""
-    id: int = Field(..., description="Unique invoice identifier")
-    client_id: int = Field(..., description="Client being billed")
-    issue_date: datetime = Field(..., description="Invoice issue date")
-    due_date: datetime = Field(..., description="Payment due date")
-    paid_date: Optional[datetime] = Field(None, description="When invoice was paid")
-    created_at: datetime
-    updated_at: datetime
+    id: int = Field(..., description="Unique invoice identifier", example=1)
+    client_id: int = Field(..., description="Client being billed", example=1)
+    issue_date: datetime = Field(..., description="Invoice issue date", example="2023-05-01T00:00:00Z")
+    due_date: datetime = Field(..., description="Payment due date", example="2023-05-31T23:59:59Z")
+    paid_date: Optional[datetime] = Field(None, description="When invoice was paid", example="2023-05-28T14:00:00Z")
+    created_at: datetime = Field(..., example="2023-05-01T00:00:00Z")
+    updated_at: datetime = Field(..., example="2023-05-28T14:00:00Z")
     
     # Related data
-    client_name: Optional[str] = None
-    is_overdue: Optional[bool] = None
-    days_until_due: Optional[int] = None
+    client_name: Optional[str] = Field(None, example="Acme Corp")
+    is_overdue: Optional[bool] = Field(None, example=False)
+    days_until_due: Optional[int] = Field(None, example=3)
     
     class Config:
         from_attributes = True
@@ -236,11 +261,11 @@ class InvoiceResponse(InvoiceBase):
 
 class FinancialStats(BaseModel):
     """Schema for financial statistics and analytics."""
-    total_revenue: float = Field(..., description="Total revenue from all payments")
-    total_expenses: float = Field(..., description="Total expenses")
-    net_profit: float = Field(..., description="Net profit (revenue - expenses)")
-    profit_margin: float = Field(..., description="Profit margin percentage")
-    revenue_by_month: Dict[str, float] = Field(..., description="Monthly revenue breakdown")
-    expenses_by_category: Dict[str, float] = Field(..., description="Expenses by category")
-    outstanding_invoices: float = Field(..., description="Total amount in unpaid invoices")
-    average_payment_time: Optional[float] = Field(None, description="Average days to payment")
+    total_revenue: float = Field(..., description="Total revenue from all payments", example=100000.00)
+    total_expenses: float = Field(..., description="Total expenses", example=40000.00)
+    net_profit: float = Field(..., description="Net profit (revenue - expenses)", example=60000.00)
+    profit_margin: float = Field(..., description="Profit margin percentage", example=60.0)
+    revenue_by_month: Dict[str, float] = Field(..., description="Monthly revenue breakdown", example={"January": 20000.00, "February": 30000.00})
+    expenses_by_category: Dict[str, float] = Field(..., description="Expenses by category", example={"software": 10000.00, "marketing": 5000.00})
+    outstanding_invoices: float = Field(..., description="Total amount in unpaid invoices", example=15000.00)
+    average_payment_time: Optional[float] = Field(None, description="Average days to payment", example=15.5)

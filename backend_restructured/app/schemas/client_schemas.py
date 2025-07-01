@@ -57,6 +57,11 @@ class ClientBase(BaseModel):
         max_length=100,
         description="Preferred platform for projects"
     )
+    category: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Client category"
+    )
     notes: Optional[str] = Field(
         None,
         max_length=1000,
@@ -71,8 +76,12 @@ class ClientCreate(ClientBase):
     """
     assigned_user_id: int = Field(
         ...,
-        description="ID of the user who will manage this client"
+        description="ID of the user who will manage this client",
+        example=1
     )
+
+class ClientCreateBulk(BaseModel):
+    clients: List[ClientCreate]
 
 class ClientUpdate(BaseModel):
     """
@@ -125,6 +134,17 @@ class ClientUpdate(BaseModel):
         None,
         description="Updated assigned user ID"
     )
+    category: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Updated client category"
+    )
+
+class ClientUpdateBulk(BaseModel):
+    clients: List[ClientUpdate]
+
+class ClientDeleteBulk(BaseModel):
+    client_ids: List[int]
 
 class ClientResponse(ClientBase):
     """
@@ -223,9 +243,9 @@ class ClientStats(BaseModel):
     
     Contains aggregated data about clients.
     """
-    total_clients: int = Field(..., description="Total number of clients")
-    active_clients: int = Field(..., description="Clients with active projects")
-    clients_by_industry: dict = Field(..., description="Client count by industry")
-    clients_by_user: dict = Field(..., description="Client count by assigned user")
-    average_project_value: float = Field(..., description="Average project value per client")
-    top_clients_by_value: List[dict] = Field(..., description="Top clients by total project value")
+    total_clients: int = Field(..., description="Total number of clients", example=100)
+    active_clients: int = Field(..., description="Clients with active projects", example=50)
+    clients_by_industry: dict = Field(..., description="Client count by industry", example={"Technology": 30, "Finance": 20})
+    clients_by_user: dict = Field(..., description="Client count by assigned user", example={"1": 60, "2": 40})
+    average_project_value: float = Field(..., description="Average project value per client", example=7500.50)
+    top_clients_by_value: List[dict] = Field(..., description="Top clients by total project value", example=[{"id": 1, "name": "Acme Corp", "total_value": 25000.00}])

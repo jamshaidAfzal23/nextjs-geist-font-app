@@ -14,7 +14,7 @@ from ...core.rbac import check_permissions
 from ...models import Client, Project, Payment
 from ...schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
-    ClientSummary, ClientSearchFilters, ClientStats
+    ClientSummary, ClientSearchFilters, ClientStats, ClientCreateBulk, ClientUpdateBulk, ClientDeleteBulk
 )
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -26,16 +26,6 @@ async def create_client(
 ):
     """
     Create a new client.
-    
-    Args:
-        client_data (ClientCreate): Client creation data
-        db (Session): Database session
-        
-    Returns:
-        ClientResponse: Created client information
-        
-    Raises:
-        HTTPException: If client with same email already exists
     """
     # Check if client with email already exists
     existing_client = db.query(Client).filter(Client.email == client_data.email).first()
@@ -53,6 +43,89 @@ async def create_client(
     
     return db_client
 
+
+@router.post("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["clients:create"]))])
+async def create_multiple_clients(
+    clients_data: ClientCreateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Create multiple client records in a single request.
+    """
+    created_clients = []
+    for client_data in clients_data.clients:
+        existing_client = db.query(Client).filter(Client.email == client_data.email).first()
+        if existing_client:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Client with email {client_data.email} already exists"
+            )
+        db_client = Client(**client_data.dict())
+        db.add(db_client)
+        created_clients.append(db_client)
+    
+    db.commit()
+    for client in created_clients:
+        db.refresh(client)
+    
+    return created_clients
+
+
+@router.put("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["clients:update"]))])
+async def update_multiple_clients(
+    clients_data: ClientUpdateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update multiple client records in a single request.
+    """
+    updated_clients = []
+    for client_data in clients_data.clients:
+        client = db.query(Client).filter(Client.id == client_data.id).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Client with ID {client_data.id} not found"
+            )
+        
+        if client_data.email and client_data.email != client.email:
+            existing_client = db.query(Client).filter(Client.email == client_data.email).first()
+            if existing_client:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Email {client_data.email} already registered to another client"
+                )
+        
+        for field, value in client_data.dict(exclude_unset=True).items():
+            setattr(client, field, value)
+        updated_clients.append(client)
+    
+    db.commit()
+    for client in updated_clients:
+        db.refresh(client)
+    
+    return updated_clients
+
+
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["clients:delete"]))])
+async def delete_multiple_clients(
+    client_ids_data: ClientDeleteBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Delete multiple client records in a single request.
+    """
+    for client_id in client_ids_data.client_ids:
+        client = db.query(Client).filter(Client.id == client_id).first()
+        if not client:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Client with ID {client_id} not found"
+            )
+        db.delete(client)
+    
+    db.commit()
+
 @router.get("/", response_model=ClientListResponse)
 async def get_clients(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
@@ -61,22 +134,13 @@ async def get_clients(
     industry: Optional[str] = Query(None, description="Filter by industry"),
     platform: Optional[str] = Query(None, description="Filter by platform preference"),
     assigned_user_id: Optional[int] = Query(None, description="Filter by assigned user"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'company_name', 'created_at')"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,company_name,email')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a paginated list of clients with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip for pagination
-        limit (int): Maximum number of records to return
-        search (str, optional): Search term for company or contact name
-        industry (str, optional): Filter by industry
-        platform (str, optional): Filter by platform preference
-        assigned_user_id (int, optional): Filter by assigned user
-        db (Session): Database session
-        
-    Returns:
-        ClientListResponse: Paginated list of clients
+    Retrieve a paginated list of clients with optional filtering and sorting.
     """
     # Build query with filters
     query = db.query(Client)
@@ -97,18 +161,18 @@ async def get_clients(
     if assigned_user_id:
         query = query.filter(Client.assigned_user_id == assigned_user_id)
     
-    # Get total count
-    total = query.count()
-    
-    # Apply pagination
-    clients = query.offset(skip).limit(limit).all()
-    
-    return {
-        "clients": clients,
-        "total": total,
-        "page": (skip // limit) + 1,
-        "per_page": limit
-    }
+    # Apply sorting
+    if sort_by:
+        if hasattr(Client, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(Client, sort_by).desc())
+            else:
+                query = query.order_by(getattr(Client, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
 
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
@@ -327,6 +391,18 @@ async def search_clients(
     
     total = query.count()
     clients = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_clients = []
+        for client in clients:
+            client_dict = client.__dict__.copy()
+            filtered_client = {k: v for k, v in client_dict.items() if k in selected_fields}
+            processed_clients.append(filtered_client)
+        clients = processed_clients
+    else:
+        clients = [ClientResponse.from_orm(client) for client in clients]
     
     return {
         "clients": clients,

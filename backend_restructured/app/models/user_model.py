@@ -61,6 +61,7 @@ class User(Base):
         String(50), 
         nullable=False, 
         default="user",
+        index=True,
         doc="User role determining access permissions (admin, manager, developer, viewer)"
     )
     
@@ -104,6 +105,17 @@ class User(Base):
         "Expense", 
         back_populates="created_by_user",
         doc="Expenses created by this user"
+    )
+    api_keys = relationship(
+        "APIKey",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    preferences = relationship(
+        "UserPreference",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
     )
     
     def __repr__(self) -> str:

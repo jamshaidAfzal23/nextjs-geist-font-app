@@ -1,45 +1,31 @@
 """
 User API endpoints for Smart CRM SaaS application.
-This module defines all user-related API routes including authentication,
-user management, and profile operations.
+This module defines all user-related API routes including user management and profile operations.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ...core.database import get_database_session
-from ...core.security import hash_password, verify_password, create_access_token, check_user_permissions, get_current_user
-from ...models import User
-from ...schemas import (
-    UserCreate, UserUpdate, UserResponse, UserLogin, UserToken,
-    UserListResponse, PasswordChange
+from ...core.security import get_current_user
+from ...auth.auth import hash_password, verify_password
+from ...models.user_model import User
+from ...schemas.user_schemas import (
+    UserCreate, UserUpdate, UserResponse, UserListResponse, PasswordChange, UserCreateBulk
 )
 
 # Create router for user endpoints with proper prefix
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter()
 
 
-
-@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
-
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_database_session)
 ):
     """
     Create a new user account.
-    
-    Args:
-        user_data (UserCreate): User registration data
-        db (Session): Database session
-        
-    Returns:
-        UserResponse: Created user information
-        
-    Raises:
-        HTTPException: If email already exists
     """
-    # Check if user with email already exists
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
@@ -47,10 +33,8 @@ async def create_user(
             detail="Email already registered"
         )
     
-    # Hash the password
     hashed_password = hash_password(user_data.password)
     
-    # Create new user
     db_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
@@ -64,49 +48,110 @@ async def create_user(
     
     return db_user
 
-@router.post("/login", response_model=UserToken, include_in_schema=False)
 
-async def login_user(
-    login_data: UserLogin,
-    db: Session = Depends(get_database_session)
+@router.post("/bulk", response_model=List[UserResponse], status_code=status.HTTP_201_CREATED)
+async def create_multiple_users(
+    users_data: UserCreateBulk,
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Authenticate user and return access token.
-    
-    Args:
-        login_data (UserLogin): User login credentials
-        db (Session): Database session
-        
-    Returns:
-        UserToken: Access token and user information
-        
-    Raises:
-        HTTPException: If credentials are invalid
+    Create multiple user accounts in a single request.
     """
-    # Find user by email
-    user = db.query(User).filter(User.email == login_data.email).first()
-    
-    if not user or not verify_password(login_data.password, user.hashed_password):
+    if current_user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create users in bulk."
         )
+
+    created_users = []
+    for user_data in users_data.users:
+        existing_user = db.query(User).filter(User.email == user_data.email).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Email {user_data.email} already registered"
+            )
+        
+        hashed_password = hash_password(user_data.password)
+        
+        db_user = User(
+            full_name=user_data.full_name,
+            email=user_data.email,
+            hashed_password=hashed_password,
+            role=user_data.role
+        )
+        
+        db.add(db_user)
+        created_users.append(db_user)
     
-    if not user.is_active:
+    db.commit()
+    for user in created_users:
+        db.refresh(user)
+    
+    return created_users
+
+
+@router.put("/bulk", response_model=List[UserResponse], status_code=status.HTTP_200_OK)
+async def update_multiple_users(
+    users_data: List[UserUpdate],
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update multiple user accounts in a single request.
+    """
+    if current_user.role != "admin":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user account"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can update users in bulk."
         )
+
+    updated_users = []
+    for user_data in users_data:
+        user = db.query(User).filter(User.id == user_data.id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_data.id} not found"
+            )
+        for field, value in user_data.dict(exclude_unset=True).items():
+            setattr(user, field, value)
+        updated_users.append(user)
     
-    # Create access token
-    access_token = create_access_token(data={"sub": user.email})
+    db.commit()
+    for user in updated_users:
+        db.refresh(user)
     
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": user
-    }
+    return updated_users
+
+
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_multiple_users(
+    user_ids: List[int],
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete multiple user accounts in a single request.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete users in bulk."
+        )
+
+    for user_id in user_ids:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User with ID {user_id} not found"
+            )
+        db.delete(user)
+    
+    db.commit()
+
 
 @router.get("/", response_model=UserListResponse)
 async def get_users(
@@ -115,23 +160,14 @@ async def get_users(
     search: Optional[str] = Query(None, description="Search term for name or email"),
     role: Optional[str] = Query(None, description="Filter by user role"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'email', 'full_name', 'created_at')"),
+    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
+    fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,full_name,email')"),
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a paginated list of users with optional filtering.
-    
-    Args:
-        skip (int): Number of records to skip for pagination
-        limit (int): Maximum number of records to return
-        search (str, optional): Search term for name or email
-        role (str, optional): Filter by user role
-        is_active (bool, optional): Filter by active status
-        db (Session): Database session
-        
-    Returns:
-        UserListResponse: Paginated list of users
+    Retrieve a paginated list of users with optional filtering, sorting, and field selection.
     """
-    # Build query with filters
     query = db.query(User)
     
     if search:
@@ -147,11 +183,36 @@ async def get_users(
     if is_active is not None:
         query = query.filter(User.is_active == is_active)
     
-    # Get total count
+    # Apply sorting
+    if sort_by:
+        if hasattr(User, sort_by):
+            if sort_order == "desc":
+                query = query.order_by(getattr(User, sort_by).desc())
+            else:
+                query = query.order_by(getattr(User, sort_by).asc())
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid sort_by field: {sort_by}"
+            )
+
     total = query.count()
     
-    # Apply pagination
     users = query.offset(skip).limit(limit).all()
+
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        # Filter the dictionary representation of each user
+        processed_users = []
+        for user in users:
+            user_dict = user.__dict__.copy()
+            filtered_user = {k: v for k, v in user_dict.items() if k in selected_fields}
+            processed_users.append(filtered_user)
+        users = processed_users
+    else:
+        # If no fields are specified, return the full UserResponse schema
+        users = [UserResponse.from_orm(user) for user in users]
     
     return {
         "users": users,
@@ -159,19 +220,3 @@ async def get_users(
         "page": (skip // limit) + 1,
         "per_page": limit
     }
-
-@router.get("/me", response_model=UserResponse)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    """
-    Get current user.
-    """
-    return current_user
-
-@router.get("/{user_id}", response_model=UserResponse)
-
-
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    """
-    Get current user.
-    """
-    return current_user

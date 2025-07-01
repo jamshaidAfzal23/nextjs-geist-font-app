@@ -1,34 +1,91 @@
 """
 Role-Based Access Control (RBAC) for the Smart CRM SaaS application.
+This module provides a flexible RBAC system with role hierarchy, permission decorators,
+and middleware for protecting API endpoints.
 """
 
-from fastapi import Depends, HTTPException, status
-from .security import get_current_user
-from ..models import User
+from functools import wraps
+from typing import Callable, Dict, List, Set
 
-# Define roles and their permissions
-# In a real application, this would be more sophisticated, perhaps stored in a database
-ROLES = {
-    "Admin": ["*"],
-    "Bidder": ["clients:read", "projects:read", "projects:create"],
-    "Developer": ["projects:read", "projects:update"],
-    "Finance": ["payments:read", "expenses:read", "invoices:read", "financial:read"],
+from fastapi import Depends, HTTPException, Request, status
+
+from ..core.security import get_current_user
+from ..models.user_model import User
+
+# Define role hierarchy. Roles inherit permissions from parent roles.
+# For example, a 'manager' inherits all 'user' permissions.
+ROLE_HIERARCHY: Dict[str, List[str]] = {
+    "admin": ["manager"],
+    "manager": ["user"],
+    "user": ["viewer"],
+    "viewer": [],
 }
 
-def check_permissions(required_permissions: list[str]):
+# Define permissions for each role.
+# Permissions are additive and inherited from parent roles.
+PERMISSIONS: Dict[str, List[str]] = {
+    "admin": [
+        "users:create", "users:delete", "roles:manage", "system:config"
+    ],
+    "manager": [
+        "clients:create", "clients:update", "clients:delete",
+        "projects:create", "projects:update", "projects:delete",
+        "reports:generate"
+    ],
+    "user": [
+        "clients:read", "projects:read", "tasks:create", "tasks:update"
+    ],
+    "viewer": [
+        "dashboard:read"
+    ],
+}
+
+def get_role_permissions(role: str) -> Set[str]:
     """
-    Dependency to check if a user has the required permissions.
+    Get all permissions for a given role, including inherited permissions.
     """
-    async def _check_permissions(current_user: User = Depends(get_current_user)):
-        user_permissions = ROLES.get(current_user.role, [])
-        if "*" in user_permissions:
-            return current_user
-        
-        for permission in required_permissions:
-            if permission not in user_permissions:
+    permissions = set(PERMISSIONS.get(role, []))
+    for parent_role in ROLE_HIERARCHY.get(role, []):
+        permissions.update(get_role_permissions(parent_role))
+    return permissions
+
+
+def require_permission(required_permission: str) -> Callable:
+    """
+    Decorator to protect an endpoint, requiring a specific permission.
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            current_user: User = kwargs.get("current_user")
+            if not current_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required",
+                )
+
+            user_permissions = get_role_permissions(current_user.role)
+            if required_permission not in user_permissions:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You do not have permission to perform this action.",
                 )
-        return current_user
-    return _check_permissions
+
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+async def rbac_middleware(request: Request, call_next: Callable):
+    """
+    RBAC middleware to protect routes based on user roles and permissions.
+    This is an example of how you might implement route-based protection.
+    In a real application, you would likely have more sophisticated logic here.
+    """
+    # In a real implementation, you would look up the required permission for the requested route.
+    # For example, you could have a mapping of routes to required permissions.
+    # For now, we'll just allow all authenticated users to proceed.
+    # The `require_permission` decorator will handle endpoint-specific protection.
+
+    response = await call_next(request)
+    return response

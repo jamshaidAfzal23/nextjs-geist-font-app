@@ -33,3 +33,8 @@ mkdocs-material==9.5.3
 
 # Utilities
 python-dotenv==1.0.1
+slowapi 
+openai 
+sendgrid 
+websockets 
+reportlab 

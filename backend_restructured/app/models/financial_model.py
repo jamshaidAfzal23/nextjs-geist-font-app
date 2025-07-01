@@ -50,6 +50,8 @@ class Payment(Base):
     )
     method = Column(String(50), nullable=False)
     transaction_id = Column(String(255), unique=True)
+    payment_gateway_id = Column(String(255), nullable=True)
+    currency = Column(String(3), default="USD", nullable=False)
     
     project_id = Column(Integer, ForeignKey("projects.id"))
     client_id = Column(Integer, ForeignKey("clients.id"))
@@ -154,17 +156,18 @@ class Invoice(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     invoice_number = Column(String(50), unique=True, nullable=False)
-    client_id = Column(Integer, ForeignKey("clients.id"))
+    client_id = Column(Integer, ForeignKey("clients.id"), index=True)
     
     amount = Column(Float, nullable=False)
     status = Column(
         String(50),
         nullable=False,
-        default=InvoiceStatus.DRAFT
+        default=InvoiceStatus.DRAFT,
+        index=True
     )
     
-    issue_date = Column(DateTime(timezone=True))
-    due_date = Column(DateTime(timezone=True))
+    issue_date = Column(DateTime(timezone=True), index=True)
+    due_date = Column(DateTime(timezone=True), index=True)
     paid_date = Column(DateTime(timezone=True))
     
     items = Column(Text)  # JSON string of invoice items
