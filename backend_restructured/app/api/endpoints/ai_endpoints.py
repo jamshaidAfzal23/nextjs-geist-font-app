@@ -9,7 +9,12 @@ from ...core.database import get_database_session
 from ...core.security import get_current_user
 from ...models.user_model import User
 from ...models.client_model import Client
-from ...schemas.ai_schemas import ClientAnalysisRequest, ClientAnalysisResponse
+from ...schemas.ai_schemas import (
+    ClientAnalysisRequest, 
+    ClientAnalysisResponse,
+    FinancialAnalysisRequest,
+    FinancialAnalysisResponse
+)
 from ...services.openai_client import get_openai_client
 
 router = APIRouter()

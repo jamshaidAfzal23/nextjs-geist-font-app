@@ -16,11 +16,10 @@ from app.core.config import settings
 from app.core.database import create_database_tables
 from app.api import api_router
 
+from app.core.logging_config import setup_logging
+
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -50,6 +49,69 @@ async def lifespan(app: FastAPI):
 from app.core.limiter import limiter
 
 # Create FastAPI application instance
+tags_metadata = [
+    {
+        "name": "auth",
+        "description": "User authentication and authorization.",
+    },
+    {
+        "name": "users",
+        "description": "Operations with users.",
+    },
+    {
+        "name": "clients",
+        "description": "Manage clients.",
+    },
+    {
+        "name": "projects",
+        "description": "Manage projects.",
+    },
+    {
+        "name": "financials",
+        "description": "Manage financials.",
+    },
+    {
+        "name": "ai",
+        "description": "AI-powered features.",
+    },
+    {
+        "name": "reports",
+        "description": "Generate and manage reports.",
+    },
+    {
+        "name": "notifications",
+        "description": "Manage notifications.",
+    },
+    {
+        "name": "backup",
+        "description": "Backup and restore data.",
+    },
+    {
+        "name": "api-keys",
+        "description": "Manage API keys.",
+    },
+    {
+        "name": "automated-tasks",
+        "description": "Manage automated tasks.",
+    },
+    {
+        "name": "dashboard",
+        "description": "Dashboard and analytics.",
+    },
+    {
+        "name": "root",
+        "description": "Root-level endpoints.",
+    },
+    {
+        "name": "health",
+        "description": "Health check endpoints.",
+    },
+    {
+        "name": "status",
+        "description": "API status endpoints.",
+    },
+]
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -57,7 +119,8 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=tags_metadata,
 )
 
 app.state.limiter = limiter
@@ -174,6 +237,8 @@ async def root():
         "redoc_url": "/redoc"
     }
 
+from app.core.database import create_database_tables, check_database_connection
+
 # Health check endpoint
 @app.get("/health", tags=["health"])
 async def health_check():
@@ -183,10 +248,12 @@ async def health_check():
     Returns:
         dict: Application health status
     """
+    db_status = "connected" if check_database_connection() else "disconnected"
     return {
         "status": "healthy",
         "timestamp": time.time(),
-        "version": settings.VERSION
+        "version": settings.VERSION,
+        "database_status": db_status
     }
 
 # API status endpoint

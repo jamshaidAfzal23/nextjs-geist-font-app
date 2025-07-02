@@ -3,7 +3,7 @@ fastapi==0.109.1
 uvicorn[standard]==0.27.0
 
 # Database
-sqlalchemy==2.0.25
+sqlalchemy==2.0.30
 alembic==1.13.1
 
 # Authentication and security
@@ -12,7 +12,8 @@ python-jose[cryptography]==3.3.0
 python-multipart==0.0.6
 
 # Data validation
-pydantic==2.6.1
+pydantic==2.5.3
+pydantic-core==2.14.6
 pydantic-settings==2.2.1
 
 email-validator==2.1.0.post1
@@ -38,3 +39,4 @@ openai
 sendgrid 
 websockets 
 reportlab 
+structlog 

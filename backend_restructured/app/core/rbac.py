@@ -5,7 +5,7 @@ and middleware for protecting API endpoints.
 """
 
 from functools import wraps
-from typing import Callable, Dict, List, Set
+from typing import Callable, Dict, List, Set 
 
 from fastapi import Depends, HTTPException, Request, status
 
@@ -89,3 +89,20 @@ async def rbac_middleware(request: Request, call_next: Callable):
 
     response = await call_next(request)
     return response
+
+
+def check_permissions(user: User, required_permission: str) -> bool:
+    """
+    Check if a user has the required permission.
+    
+    Args:
+        user: The user object to check permissions for
+        required_permission: The permission string to check (e.g. 'clients:read')
+        
+    Returns:
+        bool: True if user has permission, False otherwise
+    """
+    if not user:
+        return False
+    user_permissions = get_role_permissions(user.role)
+    return required_permission in user_permissions

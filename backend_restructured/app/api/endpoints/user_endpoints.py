@@ -153,15 +153,15 @@ async def delete_multiple_users(
     db.commit()
 
 
+from ..dependencies import get_pagination_params, get_sorting_params
+
 @router.get("/", response_model=UserListResponse)
 async def get_users(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    pagination: dict = Depends(get_pagination_params),
+    sorting: dict = Depends(get_sorting_params),
     search: Optional[str] = Query(None, description="Search term for name or email"),
     role: Optional[str] = Query(None, description="Filter by user role"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
-    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'email', 'full_name', 'created_at')"),
-    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
     fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,full_name,email')"),
     db: Session = Depends(get_database_session)
 ):
@@ -184,6 +184,8 @@ async def get_users(
         query = query.filter(User.is_active == is_active)
     
     # Apply sorting
+    sort_by = sorting["sort_by"]
+    sort_order = sorting["sort_order"]
     if sort_by:
         if hasattr(User, sort_by):
             if sort_order == "desc":
@@ -198,6 +200,9 @@ async def get_users(
 
     total = query.count()
     
+    # Apply pagination
+    skip = pagination["skip"]
+    limit = pagination["limit"]
     users = query.offset(skip).limit(limit).all()
 
     # Apply field selection

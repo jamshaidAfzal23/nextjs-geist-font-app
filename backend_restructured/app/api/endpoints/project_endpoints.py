@@ -161,18 +161,18 @@ async def delete_multiple_projects(
     
     db.commit()
 
+from ..dependencies import get_pagination_params, get_sorting_params
+
 @router.get("/", response_model=ProjectListResponse)
 async def get_projects(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    pagination: dict = Depends(get_pagination_params),
+    sorting: dict = Depends(get_sorting_params),
     search: Optional[str] = Query(None, description="Search term for project title"),
     status: Optional[ProjectStatus] = Query(None, description="Filter by project status"),
     priority: Optional[ProjectPriority] = Query(None, description="Filter by project priority"),
     client_id: Optional[int] = Query(None, description="Filter by client ID"),
     developer_id: Optional[int] = Query(None, description="Filter by developer ID"),
     is_overdue: Optional[bool] = Query(None, description="Filter overdue projects"),
-    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'title', 'start_date', 'end_date')"),
-    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
     fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,title,status')"),
     db: Session = Depends(get_database_session)
 ):
@@ -208,6 +208,8 @@ async def get_projects(
         )
     
     # Apply sorting
+    sort_by = sorting["sort_by"]
+    sort_order = sorting["sort_order"]
     if sort_by:
         if hasattr(Project, sort_by):
             if sort_order == "desc":
@@ -219,6 +221,12 @@ async def get_projects(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid sort_by field: {sort_by}"
             )
+
+    # Apply pagination
+    skip = pagination["skip"]
+    limit = pagination["limit"]
+    total = query.count()
+    projects = query.offset(skip).limit(limit).all()
 
 @router.get("/{project_id}", response_model=ProjectResponse)
 async def get_project(

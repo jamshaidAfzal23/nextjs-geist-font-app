@@ -182,3 +182,33 @@ class PasswordReset(BaseModel):
         if not any(c.isdigit() for c in v):
             raise ValueError('Password must contain at least one digit')
         return v
+
+class PasswordChange(BaseModel):
+    """
+    Schema for changing a password.
+    Requires current password and new password.
+    """
+    current_password: str = Field(
+        ...,
+        description="User's current password",
+        example="CurrentP@ssw0rd"
+    )
+    new_password: str = Field(
+        ...,
+        min_length=8,
+        description="New password (minimum 8 characters)",
+        example="NewSecureP@ssw0rd"
+    )
+    
+    @validator('new_password')
+    def validate_new_password(cls, v):
+        """Validate new password strength."""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v

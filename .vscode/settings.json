@@ -1,0 +1,10 @@
+{
+    "Codegeex.CompletionDelay": 0.5,
+    "Codegeex.Chat.LanguagePreference": "English",
+    "Codegeex.CommitMessageStyle": "ConventionalCommits",
+    "Codegeex.SidebarUI.LanguagePreference": "English",
+    "Codegeex.CommitMessage.LanguagePreference": "English",
+    "Codegeex.Comment.LanguagePreference": "English",
+    "git.allowForcePush": false,
+    "Codegeex.Privacy": false
+}

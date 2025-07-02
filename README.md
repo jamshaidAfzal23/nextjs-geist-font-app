@@ -62,22 +62,14 @@ smart-crm-saas/
 │   └── requirements.txt           # Python dependencies
 ├── frontend/                      # Next.js Frontend
 │   ├── src/
-│   │   ├── app/                   # Next.js App Router
-│   │   │   ├── layout.tsx         # Root layout with providers
-│   │   │   ├── page.tsx           # Home page with auth redirect
-│   │   │   ├── login/             # Authentication pages
-│   │   │   ├── dashboard/         # Main dashboard
-│   │   │   └── clients/           # Client management pages
+│   │   ├── app/                   # Next.js App Router (pages, layouts, etc.)
 │   │   ├── components/            # Reusable UI components
-│   │   │   ├── ui/                # Base UI components
-│   │   │   └── layout/            # Layout components
-│   │   ├── contexts/              # React contexts
-│   │   │   └── auth-context.tsx   # Authentication state management
-│   │   ├── lib/                   # Utility libraries
-│   │   │   ├── api-client.ts      # API communication layer
-│   │   │   └── utils.ts           # Helper functions
-│   │   └── types/                 # TypeScript type definitions
-│   │       └── api.ts             # API response types
+│   │   ├── contexts/              # React Contexts for global state
+│   │   ├── lib/                   # Utility functions and libraries
+│   │   ├── providers/             # React Context Providers
+│   │   ├── types/                 # TypeScript type definitions
+│   │   ├── middleware.ts          # Next.js middleware
+│   │   └── setupTests.ts          # Jest setup file for tests
 │   ├── tailwind.config.ts         # Tailwind CSS configuration
 │   ├── package.json               # Node.js dependencies
 │   └── .env.local                 # Environment variables

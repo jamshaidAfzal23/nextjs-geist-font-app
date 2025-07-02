@@ -126,16 +126,16 @@ async def delete_multiple_clients(
     
     db.commit()
 
+from ..dependencies import get_pagination_params, get_sorting_params
+
 @router.get("/", response_model=ClientListResponse)
 async def get_clients(
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    pagination: dict = Depends(get_pagination_params),
+    sorting: dict = Depends(get_sorting_params),
     search: Optional[str] = Query(None, description="Search term for company or contact name"),
     industry: Optional[str] = Query(None, description="Filter by industry"),
     platform: Optional[str] = Query(None, description="Filter by platform preference"),
     assigned_user_id: Optional[int] = Query(None, description="Filter by assigned user"),
-    sort_by: Optional[str] = Query(None, description="Field to sort by (e.g., 'company_name', 'created_at')"),
-    sort_order: Optional[str] = Query("asc", description="Sort order ('asc' or 'desc')"),
     fields: Optional[str] = Query(None, description="Comma-separated list of fields to include in the response (e.g., 'id,company_name,email')"),
     db: Session = Depends(get_database_session)
 ):
@@ -162,6 +162,8 @@ async def get_clients(
         query = query.filter(Client.assigned_user_id == assigned_user_id)
     
     # Apply sorting
+    sort_by = sorting["sort_by"]
+    sort_order = sorting["sort_order"]
     if sort_by:
         if hasattr(Client, sort_by):
             if sort_order == "desc":
@@ -173,6 +175,12 @@ async def get_clients(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid sort_by field: {sort_by}"
             )
+
+    # Apply pagination
+    skip = pagination["skip"]
+    limit = pagination["limit"]
+    total = query.count()
+    clients = query.offset(skip).limit(limit).all()
 
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(

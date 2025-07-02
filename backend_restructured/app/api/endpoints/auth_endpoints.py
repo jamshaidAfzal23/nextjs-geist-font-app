@@ -4,7 +4,7 @@ This module contains login, logout, and token refresh endpoints.
 """
 
 from ...core.limiter import limiter
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ router = APIRouter()
 @router.post("/login", response_model=Token)
 @limiter.limit("5/minute")
 async def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_database_session),
 ):

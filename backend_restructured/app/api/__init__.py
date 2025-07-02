@@ -26,7 +26,8 @@ from .endpoints import (
     user_preference_endpoints,
 )
 
-api_router = APIRouter(prefix="/api/v1")
+from app.core.config import settings
+api_router = APIRouter(prefix=settings.API_V1_STR)
 
 api_router.include_router(auth_endpoints.router, prefix="/auth", tags=["auth"])
 api_router.include_router(ai_endpoints.router, prefix="/ai", tags=["ai"])

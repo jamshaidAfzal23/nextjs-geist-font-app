@@ -9,25 +9,28 @@ from typing import Optional
 class Settings(BaseSettings):
     """
     Application settings class that loads configuration from environment variables.
-    
-    Attributes:
-        PROJECT_NAME (str): Name of the project
-        VERSION (str): API version
-        API_V1_STR (str): API version prefix for URLs
-        DATABASE_URL (str): SQLite database URL
-        CORS_ORIGINS (list): List of allowed origins for CORS
     """
     PROJECT_NAME: str = "Smart CRM SaaS"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     DATABASE_URL: str = "sqlite:///./smartcrm.db"
-    CORS_ORIGINS: list = [
-        "http://localhost:3000",  # Next.js frontend
-        "http://localhost:8000",  # FastAPI backend
-    ]
-    OPENAI_API_KEY: str = "your-openai-api-key-here" # Replace with your actual OpenAI API key
-    SENDGRID_API_KEY: str = "your-sendgrid-api-key-here"
+    
+    # Authentication
+    SECRET_KEY: str = "key here"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7  # 7 days
+    
+    # API Keys
+    OPENAI_API_KEY: str = "key here"
+    SENDGRID_API_KEY: str = "key here"
     MAIL_FROM_EMAIL: str = "your-verified-sender-email@example.com"
+    
+    # CORS
+    CORS_ORIGINS: list = [
+        "http://localhost:3000",
+        "http://localhost:8000",can
+    ]
 
     class Config:
         case_sensitive = True

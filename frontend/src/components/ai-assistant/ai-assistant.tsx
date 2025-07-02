@@ -6,101 +6,100 @@
  * - Invoice text generation
  */
 
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useMutation } from "@tanstack/react-query";
+import { sendAIPrompt } from "@/lib/api/ai";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-interface AIResponse {
-  output_text: string;
-}
+export function AIAssistant() {
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [response, setResponse] = useState("");
 
-export const AIAssistant: React.FC = () => {
-  const [inputText, setInputText] = useState('');
-  const [actionType, setActionType] = useState<'message_summary' | 'follow_up_reminder' | 'invoice_text_generation'>('message_summary');
-  const [relatedId, setRelatedId] = useState<number | null>(null);
-  const [response, setResponse] = useState<AIResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { mutate, isPending } = useMutation({
+    mutationFn: sendAIPrompt,
+    onSuccess: (data) => {
+      setResponse(data.response);
+    },
+    onError: () => {
+      toast.error("Failed to get AI response");
+    },
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setResponse(null);
-
-    try {
-      const data = await apiClient.getAIAssistantResponse(actionType, inputText, relatedId ?? undefined);
-      setResponse(data);
-    } catch (err: any) {
-      setError(err.message || 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = () => {
+    if (!prompt.trim()) return;
+    mutate({ prompt });
   };
 
   return (
-    <div className="p-4 border rounded-md shadow-md bg-white max-w-lg mx-auto">
-      <h2 className="text-xl font-semibold mb-4">AI Assistant</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="actionType" className="block font-medium mb-1">Action Type</label>
-          <select
-            id="actionType"
-            value={actionType}
-            onChange={(e) => setActionType(e.target.value as any)}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value="message_summary">Message Summary</option>
-            <option value="follow_up_reminder">Follow-up Reminder</option>
-            <option value="invoice_text_generation">Invoice Text Generation</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="inputText" className="block font-medium mb-1">Input Text</label>
-          <textarea
-            id="inputText"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            rows={4}
-            className="w-full border rounded px-3 py-2"
-            placeholder="Enter text for AI processing"
-            required={actionType === 'message_summary'}
-            disabled={actionType !== 'message_summary'}
-          />
-        </div>
-
-        <div>
-          <label htmlFor="relatedId" className="block font-medium mb-1">Related ID (optional)</label>
-          <input
-            id="relatedId"
-            type="number"
-            value={relatedId ?? ''}
-            onChange={(e) => setRelatedId(e.target.value ? parseInt(e.target.value) : null)}
-            className="w-full border rounded px-3 py-2"
-            placeholder="Enter related client/project ID"
-            disabled={actionType === 'message_summary'}
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="secondary"
+          className="fixed bottom-6 right-6 rounded-full shadow-lg h-14 w-14"
+          size="icon"
         >
-          {loading ? 'Processing...' : 'Submit'}
-        </button>
-      </form>
-
-      {error && <p className="mt-4 text-red-600">Error: {error}</p>}
-
-      {response && (
-        <div className="mt-4 p-4 bg-gray-100 rounded">
-          <h3 className="font-semibold mb-2">AI Response:</h3>
-          <pre className="whitespace-pre-wrap">{response.output_text}</pre>
+          <span className="text-xl">AI</span>
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>AI Assistant</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 flex flex-col gap-4">
+          <div className="flex-1 bg-muted/50 p-4 rounded-lg overflow-auto">
+            {response ? (
+              <div className="prose dark:prose-invert max-w-none">
+                {response}
+              </div>
+            ) : (
+              <div className="text-muted-foreground text-center py-8">
+                {isPending ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Thinking...</span>
+                  </div>
+                ) : (
+                  "Ask me anything about your clients, projects, or data"
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Ask me anything..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Send"
+              )}
+            </Button>
+          </div>
         </div>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
-};
+}

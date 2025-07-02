@@ -170,41 +170,73 @@ async def get_payment(
     
     return payment
 
-@payment_router.put("/{payment_id}", response_model=PaymentResponse)
-async def update_payment(
-    payment_id: int,
-    payment_data: PaymentUpdate,
+@payment_router.post("/bulk", response_model=List[PaymentResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["payments:create"]))])
+async def create_multiple_payments(
+    payments_data: PaymentCreateBulk,
     db: Session = Depends(get_database_session)
 ):
     """
-    Update payment information.
-    
-    Args:
-        payment_id (int): Payment ID to update
-        payment_data (PaymentUpdate): Updated payment data
-        db (Session): Database session
-        
-    Returns:
-        PaymentResponse: Updated payment information
-        
-    Raises:
-        HTTPException: If payment not found
+    Create multiple payment records in a single request.
     """
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Payment not found"
-        )
-    
-    update_data = payment_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(payment, field, value)
+    created_payments = []
+    for payment_data in payments_data.payments:
+        db_payment = Payment(**payment_data.dict())
+        db.add(db_payment)
+        created_payments.append(db_payment)
     
     db.commit()
-    db.refresh(payment)
+    for payment in created_payments:
+        db.refresh(payment)
     
-    return payment
+    return created_payments
+
+
+@payment_router.put("/bulk", response_model=List[PaymentResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["payments:update"]))])
+async def update_multiple_payments(
+    payments_data: PaymentUpdateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update multiple payment records in a single request.
+    """
+    updated_payments = []
+    for payment_data in payments_data.payments:
+        payment = db.query(Payment).filter(Payment.id == payment_data.id).first()
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Payment with ID {payment_data.id} not found"
+            )
+        
+        for field, value in payment_data.dict(exclude_unset=True).items():
+            setattr(payment, field, value)
+        updated_payments.append(payment)
+    
+    db.commit()
+    for payment in updated_payments:
+        db.refresh(payment)
+    
+    return updated_payments
+
+
+@payment_router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["payments:delete"]))])
+async def delete_multiple_payments(
+    payment_ids_data: PaymentDeleteBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Delete multiple payment records in a single request.
+    """
+    for payment_id in payment_ids_data.payment_ids:
+        payment = db.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Payment with ID {payment_id} not found"
+            )
+        db.delete(payment)
+    
+    db.commit()
 
 # EXPENSE ENDPOINTS
 @expense_router.post("/", response_model=ExpenseResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["expenses:create"]))])
@@ -495,33 +527,73 @@ async def get_expenses(
     
     return enhanced_expenses
 
-@expense_router.get("/{expense_id}", response_model=ExpenseResponse)
-async def get_expense(
-    expense_id: int,
+@expense_router.post("/bulk", response_model=List[ExpenseResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["expenses:create"]))])
+async def create_multiple_expenses(
+    expenses_data: ExpenseCreateBulk,
     db: Session = Depends(get_database_session)
 ):
     """
-    Retrieve a specific expense by ID.
-    
-    Args:
-        expense_id (int): Expense ID to retrieve
-        db (Session): Database session
-        
-    Returns:
-        ExpenseResponse: Expense information
-        
-    Raises:
-        HTTPException: If expense not found
+    Create multiple expense records in a single request.
     """
-    expense = db.query(Expense).filter(Expense.id == expense_id).first()
+    created_expenses = []
+    for expense_data in expenses_data.expenses:
+        db_expense = Expense(**expense_data.dict())
+        db.add(db_expense)
+        created_expenses.append(db_expense)
     
-    if not expense:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Expense not found"
-        )
+    db.commit()
+    for expense in created_expenses:
+        db.refresh(expense)
     
-    return expense
+    return created_expenses
+
+
+@expense_router.put("/bulk", response_model=List[ExpenseResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["expenses:update"]))])
+async def update_multiple_expenses(
+    expenses_data: ExpenseUpdateBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update multiple expense records in a single request.
+    """
+    updated_expenses = []
+    for expense_data in expenses_data.expenses:
+        expense = db.query(Expense).filter(Expense.id == expense_data.id).first()
+        if not expense:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Expense with ID {expense_data.id} not found"
+            )
+        
+        for field, value in expense_data.dict(exclude_unset=True).items():
+            setattr(expense, field, value)
+        updated_expenses.append(expense)
+    
+    db.commit()
+    for expense in updated_expenses:
+        db.refresh(expense)
+    
+    return updated_expenses
+
+
+@expense_router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["expenses:delete"]))])
+async def delete_multiple_expenses(
+    expense_ids_data: ExpenseDeleteBulk,
+    db: Session = Depends(get_database_session)
+):
+    """
+    Delete multiple expense records in a single request.
+    """
+    for expense_id in expense_ids_data.expense_ids:
+        expense = db.query(Expense).filter(Expense.id == expense_id).first()
+        if not expense:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Expense with ID {expense_id} not found"
+            )
+        db.delete(expense)
+    
+    db.commit()
 
 # INVOICE ENDPOINTS
 @invoice_router.post("/", response_model=InvoiceResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["invoices:create"]))])

@@ -67,6 +67,7 @@ class PaymentUpdate(BaseModel):
     
     All fields are optional for partial updates.
     """
+    id: Optional[int] = None
     amount: Optional[float] = Field(None, gt=0)
     status: Optional[PaymentStatus] = None
     method: Optional[PaymentMethod] = None
@@ -75,6 +76,15 @@ class PaymentUpdate(BaseModel):
     currency: Optional[str] = Field(None, max_length=3)
     notes: Optional[str] = Field(None, max_length=1000)
     payment_date: Optional[datetime] = None
+
+class PaymentCreateBulk(BaseModel):
+    payments: List[PaymentCreate]
+
+class PaymentUpdateBulk(BaseModel):
+    payments: List[PaymentUpdate]
+
+class PaymentDeleteBulk(BaseModel):
+    payment_ids: List[int]
 
 class PaymentResponse(PaymentBase):
     """Schema for payment data in API responses."""
@@ -141,12 +151,22 @@ class ExpenseUpdate(BaseModel):
     
     All fields are optional for partial updates.
     """
+    id: Optional[int] = None
     title: Optional[str] = Field(None, min_length=3, max_length=200)
     amount: Optional[float] = Field(None, gt=0)
     category: Optional[ExpenseCategory] = None
     notes: Optional[str] = Field(None, max_length=1000)
     receipt_url: Optional[str] = None
     expense_date: Optional[datetime] = None
+
+class ExpenseCreateBulk(BaseModel):
+    expenses: List[ExpenseCreate]
+
+class ExpenseUpdateBulk(BaseModel):
+    expenses: List[ExpenseUpdate]
+
+class ExpenseDeleteBulk(BaseModel):
+    expense_ids: List[int]
 
 class ExpenseResponse(ExpenseBase):
     """Schema for expense data in API responses."""

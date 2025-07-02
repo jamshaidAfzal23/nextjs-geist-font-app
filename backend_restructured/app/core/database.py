@@ -52,3 +52,13 @@ def create_database_tables():
     all required tables exist in the database.
     """
     Base.metadata.create_all(bind=engine)
+
+def check_database_connection():
+    """
+    Checks if the database connection is alive.
+    """
+    try:
+        with engine.connect() as connection:
+            return True
+    except Exception:
+        return False

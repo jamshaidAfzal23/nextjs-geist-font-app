@@ -3,6 +3,7 @@ API endpoints for managing automated tasks.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Optional
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
