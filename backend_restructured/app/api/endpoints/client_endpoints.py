@@ -14,12 +14,12 @@ from ...core.rbac import check_permissions
 from ...models import Client, Project, Payment
 from ...schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
-    ClientSummary, ClientSearchFilters, ClientStats, ClientCreateBulk, ClientUpdateBulk, ClientDeleteBulk
+    ClientSummary, ClientSearchFilters, ClientStats
 )
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
-@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["clients:create"]))])
+@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions("clients:create"))])
 async def create_client(
     client_data: ClientCreate,
     db: Session = Depends(get_database_session)
@@ -44,7 +44,7 @@ async def create_client(
     return db_client
 
 
-@router.post("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["clients:create"]))])
+@router.post("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions("clients:create"))])
 async def create_multiple_clients(
     clients_data: ClientCreateBulk,
     db: Session = Depends(get_database_session)
@@ -71,7 +71,7 @@ async def create_multiple_clients(
     return created_clients
 
 
-@router.put("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["clients:update"]))])
+@router.put("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions("clients:update"))])
 async def update_multiple_clients(
     clients_data: ClientUpdateBulk,
     db: Session = Depends(get_database_session)
@@ -107,7 +107,7 @@ async def update_multiple_clients(
     return updated_clients
 
 
-@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["clients:delete"]))])
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions("clients:delete"))])
 async def delete_multiple_clients(
     client_ids_data: ClientDeleteBulk,
     db: Session = Depends(get_database_session)
@@ -210,7 +210,7 @@ async def get_client(
     
     return client
 
-@router.put("/{client_id}", response_model=ClientResponse, dependencies=[Depends(check_permissions(["clients:update"]))])
+@router.put("/{client_id}", response_model=ClientResponse, dependencies=[Depends(check_permissions("clients:update"))])
 async def update_client(
     client_id: int,
     client_data: ClientUpdate,
@@ -257,7 +257,7 @@ async def update_client(
     
     return client
 
-@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["clients:delete"]))])
+@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions("clients:delete"))])
 async def delete_client(
     client_id: int,
     db: Session = Depends(get_database_session)

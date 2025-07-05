@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     # CORS
     CORS_ORIGINS: list = [
         "http://localhost:3000",
-        "http://localhost:8000",can
+        "http://localhost:8000"
     ]
+
 
     class Config:
         case_sensitive = True
