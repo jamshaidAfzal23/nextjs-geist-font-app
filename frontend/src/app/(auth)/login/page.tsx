@@ -1,5 +1,5 @@
-import { AuthCard } from '@/components/auth/AuthCard'
-import { LoginForm } from '@/components/auth/LoginForm'
+import { AuthCard } from '@/components/auth/auth-card'
+import { LoginForm } from '@/components/auth/login-form'
 
 export default function LoginPage() {
   return (
