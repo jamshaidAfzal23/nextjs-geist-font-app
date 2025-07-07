@@ -2,7 +2,7 @@
 Scheduled Report schemas for the Smart CRM SaaS application.
 """
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
 

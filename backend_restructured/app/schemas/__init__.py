@@ -14,7 +14,7 @@ from .client_schemas import (
 from .project_schemas import (
     ProjectBase, ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectListResponse, ProjectSummary, ProjectSearchFilters,
-    ProjectStats, ProjectMilestone
+    ProjectStats, ProjectMilestone, ProjectCreateBulk, ProjectUpdateBulk, ProjectDeleteBulk
 )
 from .financial_schemas import (
     # Payment schemas
@@ -41,7 +41,7 @@ __all__ = [
     # Project schemas
     "ProjectBase", "ProjectCreate", "ProjectUpdate", "ProjectResponse",
     "ProjectListResponse", "ProjectSummary", "ProjectSearchFilters",
-    "ProjectStats", "ProjectMilestone",
+    "ProjectStats", "ProjectMilestone", "ProjectCreateBulk", "ProjectUpdateBulk", "ProjectDeleteBulk",
     
     # Financial schemas
     "PaymentBase", "PaymentCreate", "PaymentUpdate", "PaymentResponse",

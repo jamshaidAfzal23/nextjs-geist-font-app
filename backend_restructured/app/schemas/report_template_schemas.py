@@ -2,7 +2,7 @@
 Report Template schemas for the Smart CRM SaaS application.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Dict
 from datetime import datetime
 

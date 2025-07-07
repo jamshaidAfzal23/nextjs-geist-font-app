@@ -198,6 +198,7 @@ async def get_users(
                 detail=f"Invalid sort_by field: {sort_by}"
             )
 
+    # Get total count before pagination
     total = query.count()
     
     # Apply pagination
@@ -219,9 +220,15 @@ async def get_users(
         # If no fields are specified, return the full UserResponse schema
         users = [UserResponse.from_orm(user) for user in users]
     
+    # Calculate pagination values directly
+    page = (skip // limit) + 1 if limit > 0 else 1
+    pages = (total + limit - 1) // limit if limit > 0 else 0
+    
+    # Return the response directly
     return {
-        "users": users,
+        "items": users,
         "total": total,
-        "page": (skip // limit) + 1,
-        "per_page": limit
+        "page": page,
+        "size": limit,
+        "pages": pages
     }

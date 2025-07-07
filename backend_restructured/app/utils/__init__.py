@@ -1,0 +1,1 @@
+"""Utility functions for the Smart CRM SaaS application."""

@@ -10,7 +10,7 @@ from sqlalchemy import func, and_
 from typing import List, Optional
 from datetime import datetime, timedelta
 from ...core.database import get_database_session
-from ...core.rbac import check_permissions
+from ...core.rbac import require_permissions
 from ...models import Project, Client, User, Payment, Expense
 from ...models.project_model import ProjectStatus, ProjectPriority
 from ...schemas import (
@@ -20,7 +20,7 @@ from ...schemas import (
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-@router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["projects:create"]))])
+@router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permissions(["projects:create"]))])
 async def create_project(
     project_data: ProjectCreate,
     db: Session = Depends(get_database_session)
@@ -54,7 +54,7 @@ async def create_project(
     return db_project
 
 
-@router.post("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(check_permissions(["projects:create"]))])
+@router.post("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permissions(["projects:create"]))])
 async def create_multiple_projects(
     projects_data: ProjectCreateBulk,
     db: Session = Depends(get_database_session)
@@ -92,7 +92,7 @@ async def create_multiple_projects(
     return created_projects
 
 
-@router.put("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(check_permissions(["projects:update"]))])
+@router.put("/bulk", response_model=List[ProjectResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(require_permissions(["projects:update"]))])
 async def update_multiple_projects(
     projects_data: ProjectUpdateBulk,
     db: Session = Depends(get_database_session)
@@ -142,7 +142,7 @@ async def update_multiple_projects(
     return updated_projects
 
 
-@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["projects:delete"]))])
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permissions(["projects:delete"]))])
 async def delete_multiple_projects(
     project_ids_data: ProjectDeleteBulk,
     db: Session = Depends(get_database_session)
@@ -269,7 +269,7 @@ async def get_project(
     
     return project_dict
 
-@router.put("/{project_id}", response_model=ProjectResponse, dependencies=[Depends(check_permissions(["projects:update"]))])
+@router.put("/{project_id}", response_model=ProjectResponse, dependencies=[Depends(require_permissions(["projects:update"]))])
 async def update_project(
     project_id: int,
     project_data: ProjectUpdate,
@@ -329,7 +329,7 @@ async def update_project(
     
     return project
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(check_permissions(["projects:delete"]))])
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permissions(["projects:delete"]))])
 async def delete_project(
     project_id: int,
     db: Session = Depends(get_database_session)

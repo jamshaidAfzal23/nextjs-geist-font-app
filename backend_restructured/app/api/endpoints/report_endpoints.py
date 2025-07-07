@@ -1,6 +1,5 @@
 
-API endpoints for report generation.
-
+"""API endpoints for report generation."""
 
 import csv
 from fastapi import APIRouter, Depends, HTTPException, status

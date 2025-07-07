@@ -106,3 +106,23 @@ def check_permissions(user: User, required_permission: str) -> bool:
         return False
     user_permissions = get_role_permissions(user.role)
     return required_permission in user_permissions
+
+
+def require_permissions(required_permission: str):
+    """
+    Dependency function to check if current user has required permission.
+    
+    Args:
+        required_permission: The permission string to check (e.g. 'clients:read')
+        
+    Returns:
+        Dependency function for FastAPI
+    """
+    def permission_dependency(current_user: User = Depends(get_current_user)):
+        if not check_permissions(current_user, required_permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action."
+            )
+        return current_user
+    return permission_dependency

@@ -5,7 +5,7 @@ API endpoints for notifications.
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from ...core.database import get_database_session
 from ...core.security import get_current_user

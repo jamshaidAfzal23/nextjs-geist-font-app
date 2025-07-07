@@ -1,0 +1,40 @@
+# Test dependencies
+pytest==7.4.0
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.24.1
+asyncio==3.4.3
+aiosqlite==0.19.0
+
+# Application dependencies
+fastapi==0.103.1
+uvicorn==0.23.2
+sqlalchemy==2.0.20
+alembic==1.12.0
+pydantic==1.10.12
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.6
+email-validator==2.0.0
+python-dotenv==1.0.0
+starlette==0.27.0
+typing-extensions==4.7.1
+python-dateutil==2.8.2
+aiofiles==23.1.0
+jinja2==3.1.2
+python-docx==0.8.11
+openpyxl==3.1.2
+reportlab==4.0.4
+
+# Data Science and ML dependencies
+pandas==2.2.3
+matplotlib==3.10.3
+seaborn==0.13.2
+scikit-learn==1.7.0
+torch==2.7.1
+spacy==3.8.7
+transformers==4.53.1
+tokenizers==0.21.2
+
+# Install spaCy language model
+# Run after installing requirements: python -m spacy download en_core_web_sm

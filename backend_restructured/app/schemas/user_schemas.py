@@ -146,10 +146,11 @@ class UserListResponse(BaseModel):
     
     Contains list of users with pagination metadata.
     """
-    users: List[UserResponse] = Field(..., description="List of users")
+    items: List[UserResponse] = Field(..., description="List of users")
     total: int = Field(..., description="Total number of users")
     page: int = Field(..., description="Current page number")
-    per_page: int = Field(..., description="Number of users per page")
+    size: int = Field(..., description="Number of users per page")
+    pages: int = Field(..., description="Total number of pages")
     
 class PasswordResetRequest(BaseModel):
     """
