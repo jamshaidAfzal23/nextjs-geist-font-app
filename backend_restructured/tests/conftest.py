@@ -15,7 +15,7 @@ sys.path.append(parent_dir)
 from main import app
 from app.core.database import get_database_session, Base
 from app.models.user_model import User
-from app.core.security import hash_password, create_access_token
+from app.auth.auth import hash_password, create_access_token
 
 # Use an in-memory SQLite database for testing
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -41,28 +41,6 @@ def db_session(engine):
 
     Session = sessionmaker(bind=engine)
     session = Session()
-
-    # Create test admin user
-    admin_user = User(
-        email="admin@example.com",
-        full_name="Admin User",
-        role="admin",
-        is_admin=True,
-        hashed_password=hash_password("admin123")
-    )
-    session.add(admin_user)
-
-    # Create test regular user
-    regular_user = User(
-        email="user@example.com",
-        full_name="Regular User",
-        is_admin=False,
-        role="user",
-        hashed_password=hash_password("user123")
-    )
-    session.add(regular_user)
-
-    session.commit()
     
     # Override the get_db dependency
     def override_get_db():
@@ -97,6 +75,10 @@ def create_tables(engine):
 @pytest.fixture(scope="function")
 def seed_database(db_session: Session):
     """Seed the database with test data."""
+    # Import models
+    from app.models.client_model import Client
+    from app.models.project_model import Project
+    
     # Create test users
     admin_user = User(
         email="admin@example.com",
@@ -119,9 +101,94 @@ def seed_database(db_session: Session):
     db_session.refresh(admin_user)
     db_session.refresh(regular_user)
     
+    # Create test clients
+    test_client_1 = Client(
+        id=1,
+        company_name="Test Company 1",
+        contact_person_name="John Doe",
+        email="john@testcompany1.com",
+        phone_number="1234567890",
+        address="123 Test St, Test City, TC 12345",
+        industry="Technology",
+        platform_preference="Web",
+        general_notes="Test client for automated testing",
+        assigned_user_id=admin_user.id
+    )
+    
+    test_client_2 = Client(
+        id=2,
+        company_name="Test Company 2",
+        contact_person_name="Jane Smith",
+        email="jane@testcompany2.com",
+        phone_number="0987654321",
+        address="456 Test Ave, Test City, TC 54321",
+        industry="Finance",
+        platform_preference="Mobile",
+        general_notes="Another test client",
+        assigned_user_id=regular_user.id
+    )
+    
+    db_session.add_all([test_client_1, test_client_2])
+    db_session.commit()
+    db_session.refresh(test_client_1)
+    db_session.refresh(test_client_2)
+    
+    # Create test financial data
+    from app.models.financial_model import Invoice, Payment
+    from datetime import datetime, timedelta
+    
+    # Create test invoices
+    test_invoice_1 = Invoice(
+        id=1,
+        client_id=test_client_1.id,
+        amount=5000.0,
+        issue_date=datetime.now(),
+        due_date=datetime.now() + timedelta(days=30),
+        status="sent",
+        description="Test invoice 1",
+        items='[]'  # JSON string instead of Python list
+    )
+    
+    test_invoice_2 = Invoice(
+        id=2,
+        client_id=test_client_2.id,
+        amount=3000.0,
+        issue_date=datetime.now(),
+        due_date=datetime.now() + timedelta(days=15),
+        status="paid",
+        description="Test invoice 2",
+        items='[]'  # JSON string instead of Python list
+    )
+    
+    db_session.add_all([test_invoice_1, test_invoice_2])
+    db_session.commit()
+    db_session.refresh(test_invoice_1)
+    db_session.refresh(test_invoice_2)
+    
+    # Create test payments
+    test_payment_1 = Payment(
+        id=1,
+        invoice_id=test_invoice_2.id,
+        client_id=test_client_2.id,
+        project_id=1,  # Add project_id to avoid validation errors
+        amount=3000.0,
+        payment_date=datetime.now(),
+        payment_method="credit_card",
+        transaction_id="txn_test_123"
+    )
+    
+    db_session.add(test_payment_1)
+    db_session.commit()
+    db_session.refresh(test_payment_1)
+    
     return {
         "admin_user": admin_user,
-        "regular_user": regular_user
+        "regular_user": regular_user,
+        "test_client_1": test_client_1,
+        "test_client_2": test_client_2,
+        "test_invoice_1": test_invoice_1,
+        "test_invoice_2": test_invoice_2,
+        "test_payment_1": test_payment_1
     }
 
 @pytest.fixture

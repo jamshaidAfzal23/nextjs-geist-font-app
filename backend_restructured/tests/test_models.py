@@ -11,7 +11,6 @@ from app.models.financial_model import Invoice, Payment
 from app.models.client_note_model import ClientNote
 from app.models.client_history_model import ClientHistory
 
-@pytest.mark.asyncio
 def test_user_model(db_session: Session):
     """Test User model creation and relationships."""
     # Create a test user
@@ -23,8 +22,8 @@ def test_user_model(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     # Verify user was created with correct attributes
     assert user.id is not None
@@ -43,18 +42,16 @@ def test_user_model(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(client)
+    db_session.refresh(user)
     
     # Get clients assigned to user
-    result = await db_session.execute(user.clients.statement)
-    user_clients = result.scalars().all()
+    user_clients = db_session.query(Client).filter(Client.assigned_user_id == user.id).all()
     
     assert len(user_clients) == 1
     assert user_clients[0].company_name == "Model Test Client"
 
-@pytest.mark.asyncio
 def test_client_model(db_session: Session):
     """Test Client model creation and relationships."""
     # Create a test user first
@@ -66,8 +63,8 @@ def test_client_model(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     # Create a test client
     client = Client(
@@ -84,8 +81,8 @@ def test_client_model(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(client)
     
     # Verify client was created with correct attributes
     assert client.id is not None
@@ -109,13 +106,12 @@ def test_client_model(db_session: Session):
     )
     
     db_session.add(project)
-    await db_session.commit()
-    await db_session.refresh(project)
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(project)
+    db_session.refresh(client)
     
     # Get projects for client
-    result = await db_session.execute(client.projects.statement)
-    client_projects = result.scalars().all()
+    client_projects = db_session.query(Project).filter(Project.client_id == client.id).all()
     
     assert len(client_projects) == 1
     assert client_projects[0].name == "Client Model Test Project"
@@ -126,7 +122,6 @@ def test_client_model(db_session: Session):
     # Test active_projects_count property
     assert client.active_projects_count == 1
 
-@pytest.mark.asyncio
 def test_project_model(db_session: Session):
     """Test Project model creation and relationships."""
     # Create a test user and client first
@@ -138,8 +133,8 @@ def test_project_model(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     client = Client(
         company_name="Project Model Test Client",
@@ -149,8 +144,8 @@ def test_project_model(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(client)
     
     # Create a test project
     project = Project(
@@ -165,8 +160,8 @@ def test_project_model(db_session: Session):
     )
     
     db_session.add(project)
-    await db_session.commit()
-    await db_session.refresh(project)
+    db_session.commit()
+    db_session.refresh(project)
     
     # Verify project was created with correct attributes
     assert project.id is not None
@@ -190,18 +185,16 @@ def test_project_model(db_session: Session):
     )
     
     db_session.add(invoice)
-    await db_session.commit()
-    await db_session.refresh(invoice)
-    await db_session.refresh(project)
+    db_session.commit()
+    db_session.refresh(invoice)
+    db_session.refresh(project)
     
     # Get invoices for project
-    result = await db_session.execute(project.invoices.statement)
-    project_invoices = result.scalars().all()
+    project_invoices = db_session.query(Invoice).filter(Invoice.project_id == project.id).all()
     
     assert len(project_invoices) == 1
     assert project_invoices[0].amount == 5000.0
 
-@pytest.mark.asyncio
 def test_invoice_and_payment_models(db_session: Session):
     """Test Invoice and Payment models creation and relationships."""
     # Create test user, client, and project first
@@ -213,8 +206,8 @@ def test_invoice_and_payment_models(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     client = Client(
         company_name="Invoice Model Test Client",
@@ -224,8 +217,8 @@ def test_invoice_and_payment_models(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(client)
     
     project = Project(
         name="Invoice Model Test Project",
@@ -239,8 +232,8 @@ def test_invoice_and_payment_models(db_session: Session):
     )
     
     db_session.add(project)
-    await db_session.commit()
-    await db_session.refresh(project)
+    db_session.commit()
+    db_session.refresh(project)
     
     # Create a test invoice
     invoice = Invoice(
@@ -254,8 +247,8 @@ def test_invoice_and_payment_models(db_session: Session):
     )
     
     db_session.add(invoice)
-    await db_session.commit()
-    await db_session.refresh(invoice)
+    db_session.commit()
+    db_session.refresh(invoice)
     
     # Verify invoice was created with correct attributes
     assert invoice.id is not None
@@ -276,9 +269,9 @@ def test_invoice_and_payment_models(db_session: Session):
     )
     
     db_session.add(payment)
-    await db_session.commit()
-    await db_session.refresh(payment)
-    await db_session.refresh(invoice)
+    db_session.commit()
+    db_session.refresh(payment)
+    db_session.refresh(invoice)
     
     # Verify payment was created with correct attributes
     assert payment.id is not None
@@ -289,8 +282,7 @@ def test_invoice_and_payment_models(db_session: Session):
     assert payment.created_at is not None
     
     # Get payments for invoice
-    result = await db_session.execute(invoice.payments.statement)
-    invoice_payments = result.scalars().all()
+    invoice_payments = db_session.query(Payment).filter(Payment.invoice_id == invoice.id).all()
     
     assert len(invoice_payments) == 1
     assert invoice_payments[0].amount == 5000.0
@@ -301,7 +293,6 @@ def test_invoice_and_payment_models(db_session: Session):
     # Test remaining_amount property
     assert invoice.remaining_amount == 5000.0
 
-@pytest.mark.asyncio
 def test_client_note_model(db_session: Session):
     """Test ClientNote model creation and relationships."""
     # Create test user and client first
@@ -313,8 +304,8 @@ def test_client_note_model(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     client = Client(
         company_name="Note Model Test Client",
@@ -324,8 +315,8 @@ def test_client_note_model(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(client)
     
     # Create a test note
     note = ClientNote(
@@ -335,8 +326,8 @@ def test_client_note_model(db_session: Session):
     )
     
     db_session.add(note)
-    await db_session.commit()
-    await db_session.refresh(note)
+    db_session.commit()
+    db_session.refresh(note)
     
     # Verify note was created with correct attributes
     assert note.id is not None
@@ -346,13 +337,11 @@ def test_client_note_model(db_session: Session):
     assert note.created_at is not None
     
     # Get notes for client
-    result = await db_session.execute(client.notes.statement)
-    client_notes = result.scalars().all()
+    client_notes = db_session.query(ClientNote).filter(ClientNote.client_id == client.id).all()
     
     assert len(client_notes) == 1
     assert client_notes[0].content == "Test note for client note model"
 
-@pytest.mark.asyncio
 def test_client_history_model(db_session: Session):
     """Test ClientHistory model creation and relationships."""
     # Create test user and client first
@@ -364,8 +353,8 @@ def test_client_history_model(db_session: Session):
     )
     
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    db_session.commit()
+    db_session.refresh(user)
     
     client = Client(
         company_name="History Model Test Client",
@@ -375,8 +364,8 @@ def test_client_history_model(db_session: Session):
     )
     
     db_session.add(client)
-    await db_session.commit()
-    await db_session.refresh(client)
+    db_session.commit()
+    db_session.refresh(client)
     
     # Create a test history entry
     history = ClientHistory(
@@ -387,8 +376,8 @@ def test_client_history_model(db_session: Session):
     )
     
     db_session.add(history)
-    await db_session.commit()
-    await db_session.refresh(history)
+    db_session.commit()
+    db_session.refresh(history)
     
     # Verify history was created with correct attributes
     assert history.id is not None
@@ -399,8 +388,7 @@ def test_client_history_model(db_session: Session):
     assert history.timestamp is not None
     
     # Get history for client
-    result = await db_session.execute(client.history.statement)
-    client_history = result.scalars().all()
+    client_history = db_session.query(ClientHistory).filter(ClientHistory.client_id == client.id).all()
     
     assert len(client_history) == 1
     assert client_history[0].action == "created"

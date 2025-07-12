@@ -18,7 +18,7 @@ from ...schemas import (
     ProjectSummary, ProjectSearchFilters, ProjectStats, ProjectCreateBulk, ProjectUpdateBulk, ProjectDeleteBulk
 )
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(tags=["projects"])
 
 @router.post("/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permissions(["projects:create"]))])
 async def create_project(

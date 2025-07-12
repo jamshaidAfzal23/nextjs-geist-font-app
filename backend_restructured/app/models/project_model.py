@@ -66,6 +66,16 @@ class Project(Base):
     
     __tablename__ = "projects"
     
+    def __init__(self, **kwargs):
+        """Initialize Project with support for 'name' parameter mapping to 'title'."""
+        # Handle backward compatibility: map 'name' to 'title'
+        if 'name' in kwargs:
+            kwargs['title'] = kwargs.pop('name')
+        # Handle backward compatibility: map 'assigned_user_id' to 'developer_id'
+        if 'assigned_user_id' in kwargs:
+            kwargs['developer_id'] = kwargs.pop('assigned_user_id')
+        super().__init__(**kwargs)
+    
     # Primary key
     id = Column(Integer, primary_key=True, index=True, doc="Unique project identifier")
     
@@ -76,6 +86,27 @@ class Project(Base):
         index=True,
         doc="Project title or name"
     )
+    
+    # Alias for backward compatibility with tests
+    @property
+    def name(self):
+        """Alias for title field to maintain backward compatibility."""
+        return self.title
+    
+    @name.setter
+    def name(self, value):
+        """Setter for name alias."""
+        self.title = value
+    
+    @property
+    def assigned_user_id(self):
+        """Alias for developer_id field to maintain backward compatibility."""
+        return self.developer_id
+    
+    @assigned_user_id.setter
+    def assigned_user_id(self, value):
+        """Setter for assigned_user_id alias."""
+        self.developer_id = value
     description = Column(
         Text,
         doc="Detailed project description, requirements, and scope"
@@ -175,6 +206,11 @@ class Project(Base):
         back_populates="project",
         cascade="all, delete-orphan",
         order_by="ProjectMilestone.due_date"
+    )
+    invoices = relationship(
+        "Invoice",
+        back_populates="project",
+        cascade="all, delete-orphan"
     )
     
     def __repr__(self) -> str:

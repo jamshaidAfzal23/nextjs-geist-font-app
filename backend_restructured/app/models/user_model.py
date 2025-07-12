@@ -76,6 +76,11 @@ class User(Base):
         default=False,
         doc="Whether the user's email address has been verified"
     )
+    is_admin = Column(
+        Boolean, 
+        default=False,
+        doc="Whether the user has administrative privileges"
+    )
     
     # Timestamps
     created_at = Column(

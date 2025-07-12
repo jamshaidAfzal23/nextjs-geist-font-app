@@ -164,7 +164,7 @@ class Client(Base):
         Returns:
             float: Sum of all project values for this client
         """
-        return sum(project.total_amount for project in self.projects if project.total_amount)
+        return sum(project.budget for project in self.projects if project.budget)
     
     @property
     def active_projects_count(self) -> int:

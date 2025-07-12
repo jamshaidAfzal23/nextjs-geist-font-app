@@ -10,7 +10,7 @@ from ...schemas.dashboard_schemas import DashboardStats
 from sqlalchemy import func
 from ...models.project_model import ProjectStatus
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(tags=["dashboard"])
 
 @router.get("/stats", response_model=DashboardStats)
 async def get_dashboard_stats(db: Session = Depends(get_database_session)):

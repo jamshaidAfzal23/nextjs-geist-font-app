@@ -89,6 +89,10 @@ class ClientUpdate(BaseModel):
     
     All fields are optional for partial updates.
     """
+    id: Optional[int] = Field(
+        None,
+        description="Client ID for bulk operations"
+    )
     company_name: Optional[str] = Field(
         None,
         min_length=2,

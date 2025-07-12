@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from ...auth.auth import (create_access_token, create_refresh_token,
                           verify_password)
 from ...core.database import get_database_session
+from ...core.security import get_current_user
 from ...models.user_model import User
 from ...schemas.token_schemas import Token
 from datetime import datetime, timedelta
@@ -40,17 +41,18 @@ async def login_for_access_token(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_access_token(refresh_token: str, db: Session = Depends(get_database_session)):
-    # This is a simplified refresh token implementation.
-    # In a production environment, you would want to store and validate refresh tokens more securely.
-    # For example, you could store them in a database and associate them with a user.
-    # You would also want to handle refresh token rotation and expiration.
-
-    # For now, we'll just create a new access token.
-    # A real implementation would verify the refresh token first.
-
-    access_token = create_access_token(data={"sub": "refresheduser@example.com"})
-    return {"access_token": access_token, "token_type": "bearer"}
+async def refresh_access_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_database_session)
+):
+    """
+    Refresh the access token for the current authenticated user.
+    """
+    # Create a new access token for the current user
+    access_token = create_access_token(data={"sub": current_user.email})
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    
+    return {"access_token": access_token, "token_type": "bearer", "expires_at": expires_at}
 
 
 from ...schemas.user_schemas import PasswordResetRequest, PasswordReset
@@ -80,3 +82,13 @@ async def reset_password(request: PasswordReset, db: Session = Depends(get_datab
     # In a real application, you would verify the password reset token and find the associated user.
     # For now, we'll just return a dummy message.
     return {"message": "Password has been reset"}
+
+
+@router.post("/logout")
+async def logout():
+    """
+    Logout the current user.
+    In a stateless JWT implementation, logout is typically handled client-side
+    by simply discarding the token. This endpoint exists for API completeness.
+    """
+    return {"message": "Successfully logged out"}

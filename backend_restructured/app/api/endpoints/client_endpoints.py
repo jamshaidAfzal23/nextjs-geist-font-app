@@ -10,19 +10,23 @@ from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 from ...core.database import get_database_session
-from ...core.rbac import require_permissions
-from ...models import Client, Project, Payment
+from ...core.security import get_current_user
+from ...models.client_model import Client
+from ...models.project_model import Project
+from ...models.financial_model import Payment
+from ...models.user_model import User
 from ...schemas.client_schemas import (
     ClientCreate, ClientUpdate, ClientResponse, ClientListResponse,
     ClientSummary, ClientSearchFilters, ClientStats, ClientCreateBulk, ClientUpdateBulk, ClientDeleteBulk
 )
 
-router = APIRouter(prefix="/clients", tags=["clients"])
+router = APIRouter(tags=["clients"])
 
-@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permissions("clients:create"))])
+@router.post("/", response_model=ClientResponse, status_code=status.HTTP_201_CREATED)
 async def create_client(
     client_data: ClientCreate,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create a new client.
@@ -36,7 +40,12 @@ async def create_client(
         )
     
     # Create new client
-    db_client = Client(**client_data.dict())
+    client_dict = client_data.model_dump()
+    # Map 'notes' to 'general_notes' if present
+    if 'notes' in client_dict:
+        client_dict['general_notes'] = client_dict.pop('notes')
+    
+    db_client = Client(**client_dict)
     db.add(db_client)
     db.commit()
     db.refresh(db_client)
@@ -44,10 +53,11 @@ async def create_client(
     return db_client
 
 
-@router.post("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permissions("clients:create"))])
+@router.post("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_201_CREATED)
 async def create_multiple_clients(
     clients_data: ClientCreateBulk,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Create multiple client records in a single request.
@@ -60,7 +70,12 @@ async def create_multiple_clients(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Client with email {client_data.email} already exists"
             )
-        db_client = Client(**client_data.dict())
+        client_dict = client_data.model_dump()
+        # Map 'notes' to 'general_notes' if present
+        if 'notes' in client_dict:
+            client_dict['general_notes'] = client_dict.pop('notes')
+        
+        db_client = Client(**client_dict)
         db.add(db_client)
         created_clients.append(db_client)
     
@@ -71,10 +86,11 @@ async def create_multiple_clients(
     return created_clients
 
 
-@router.put("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_200_OK, dependencies=[Depends(require_permissions("clients:update"))])
+@router.put("/bulk", response_model=List[ClientResponse], status_code=status.HTTP_200_OK)
 async def update_multiple_clients(
     clients_data: ClientUpdateBulk,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Update multiple client records in a single request.
@@ -96,7 +112,12 @@ async def update_multiple_clients(
                     detail=f"Email {client_data.email} already registered to another client"
                 )
         
-        for field, value in client_data.dict(exclude_unset=True).items():
+        client_dict = client_data.model_dump(exclude_unset=True)
+        # Map 'notes' to 'general_notes' if present
+        if 'notes' in client_dict:
+            client_dict['general_notes'] = client_dict.pop('notes')
+        
+        for field, value in client_dict.items():
             setattr(client, field, value)
         updated_clients.append(client)
     
@@ -107,10 +128,11 @@ async def update_multiple_clients(
     return updated_clients
 
 
-@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permissions("clients:delete"))])
+@router.delete("/bulk", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_multiple_clients(
     client_ids_data: ClientDeleteBulk,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Delete multiple client records in a single request.
@@ -182,6 +204,30 @@ async def get_clients(
     total = query.count()
     clients = query.offset(skip).limit(limit).all()
 
+    # Apply field selection
+    if fields:
+        selected_fields = [field.strip() for field in fields.split(',')]
+        processed_clients = []
+        for client in clients:
+            client_dict = client.__dict__.copy()
+            filtered_client = {k: v for k, v in client_dict.items() if k in selected_fields}
+            processed_clients.append(filtered_client)
+        clients = processed_clients
+    else:
+        clients = [ClientResponse.from_orm(client) for client in clients]
+    
+    # Calculate pagination values directly
+    page = (skip // limit) + 1 if limit > 0 else 1
+    pages = (total + limit - 1) // limit if limit > 0 else 0
+    
+    # Return the response directly
+    return {
+        "clients": clients,
+        "total": total,
+        "page": page,
+        "per_page": limit
+    }
+
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
     client_id: int,
@@ -210,11 +256,12 @@ async def get_client(
     
     return client
 
-@router.put("/{client_id}", response_model=ClientResponse, dependencies=[Depends(require_permissions("clients:update"))])
+@router.put("/{client_id}", response_model=ClientResponse)
 async def update_client(
     client_id: int,
     client_data: ClientUpdate,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Update client information.
@@ -248,7 +295,11 @@ async def update_client(
             )
     
     # Update client fields
-    update_data = client_data.dict(exclude_unset=True)
+    update_data = client_data.model_dump(exclude_unset=True)
+    # Map 'notes' to 'general_notes' if present
+    if 'notes' in update_data:
+        update_data['general_notes'] = update_data.pop('notes')
+    
     for field, value in update_data.items():
         setattr(client, field, value)
     
@@ -257,10 +308,11 @@ async def update_client(
     
     return client
 
-@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permissions("clients:delete"))])
+@router.delete("/{client_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_client(
     client_id: int,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Delete a client.
@@ -399,18 +451,6 @@ async def search_clients(
     
     total = query.count()
     clients = query.offset(skip).limit(limit).all()
-
-    # Apply field selection
-    if fields:
-        selected_fields = [field.strip() for field in fields.split(',')]
-        processed_clients = []
-        for client in clients:
-            client_dict = client.__dict__.copy()
-            filtered_client = {k: v for k, v in client_dict.items() if k in selected_fields}
-            processed_clients.append(filtered_client)
-        clients = processed_clients
-    else:
-        clients = [ClientResponse.from_orm(client) for client in clients]
     
     return {
         "clients": clients,

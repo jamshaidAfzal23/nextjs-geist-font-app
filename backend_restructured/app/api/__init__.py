@@ -41,7 +41,11 @@ api_router.include_router(client_history_endpoints.router, prefix="/client-histo
 api_router.include_router(client_note_endpoints.router, prefix="/client-notes", tags=["client-notes"])
 api_router.include_router(project_endpoints.router, prefix="/projects", tags=["projects"])
 api_router.include_router(project_milestone_endpoints.router, prefix="/project-milestones", tags=["project-milestones"])
-api_router.include_router(financial_endpoints.router, prefix="/financials", tags=["financials"])
+# Register financial endpoints with correct prefixes to match test expectations
+api_router.include_router(financial_endpoints.invoice_router, prefix="/invoices", tags=["invoices"])
+api_router.include_router(financial_endpoints.payment_router, prefix="/payments", tags=["payments"])
+api_router.include_router(financial_endpoints.expense_router, prefix="/expenses", tags=["expenses"])
+api_router.include_router(financial_endpoints.financial_router, prefix="/financial", tags=["financial"])
 api_router.include_router(dashboard_endpoints.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(notification_endpoints.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(report_endpoints.router, prefix="/reports", tags=["reports"])

@@ -232,3 +232,128 @@ async def get_users(
         "size": limit,
         "pages": pages
     }
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get the current authenticated user's profile information.
+    """
+    return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_current_user_profile(
+    user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_database_session)
+):
+    """
+    Update the current authenticated user's profile information.
+    """
+    for field, value in user_data.dict(exclude_unset=True).items():
+        if field != "id":  # Don't allow updating ID
+            setattr(current_user, field, value)
+    
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.post("/me/change-password", status_code=status.HTTP_200_OK)
+async def change_current_user_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_database_session)
+):
+    """
+    Change the current authenticated user's password.
+    """
+    if not verify_password(password_data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    current_user.hashed_password = hash_password(password_data.new_password)
+    db.commit()
+    
+    return {"message": "Password changed successfully"}
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user_by_id(
+    user_id: int,
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get a specific user by ID.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    return user
+
+
+@router.put("/{user_id}", response_model=UserResponse)
+async def update_user_by_id(
+    user_id: int,
+    user_data: UserUpdate,
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update a specific user by ID.
+    """
+    if current_user.role != "admin" and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    for field, value in user_data.dict(exclude_unset=True).items():
+        if field != "id":  # Don't allow updating ID
+            setattr(user, field, value)
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user_by_id(
+    user_id: int,
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Delete a specific user by ID.
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete users"
+        )
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    db.delete(user)
+    db.commit()
