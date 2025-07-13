@@ -16,6 +16,7 @@ from main import app
 from app.core.database import get_database_session, Base
 from app.models.user_model import User
 from app.auth.auth import hash_password, create_access_token
+from fastapi.testclient import TestClient
 
 # Use an in-memory SQLite database for testing
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -35,6 +36,14 @@ def db_session(engine):
     from app.models import client_note_model, client_history_model, project_milestone_model
     from app.models import api_key_model, user_preference_model
     
+    # Import specific model classes to ensure they're registered
+    from app.models.user_model import User
+    from app.models.client_model import Client
+    from app.models.project_model import Project
+    from app.models.financial_model import Payment, Invoice, Expense
+    from app.models.client_note_model import ClientNote
+    from app.models.client_history_model import ClientHistory
+    
     # Create all tables
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
@@ -42,22 +51,30 @@ def db_session(engine):
     Session = sessionmaker(bind=engine)
     session = Session()
     
-    # Override the get_db dependency
+    try:
+        yield session
+    finally:
+        # Clean up
+        session.rollback()
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture(scope="function")
+def test_client(db_session):
+    """Create a test client with database dependency override."""
     def override_get_db():
         try:
-            yield session
+            yield db_session
         finally:
-            session.close()
+            pass  # Don't close here, let the db_session fixture handle it
     
     app.dependency_overrides[get_database_session] = override_get_db
     
-    yield session
-    
-    # Clean up
-    session.rollback()
-    Base.metadata.drop_all(bind=engine)
-    session.close()
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.clear()
 
 @pytest.fixture(scope="session", autouse=True)
 def create_tables(engine):
@@ -66,6 +83,14 @@ def create_tables(engine):
     from app.models import user_model, client_model, project_model, financial_model
     from app.models import client_note_model, client_history_model, project_milestone_model
     from app.models import api_key_model, user_preference_model
+    
+    # Import specific model classes to ensure they're registered
+    from app.models.user_model import User
+    from app.models.client_model import Client
+    from app.models.project_model import Project
+    from app.models.financial_model import Payment, Invoice, Expense
+    from app.models.client_note_model import ClientNote
+    from app.models.client_history_model import ClientHistory
     
     # Create all tables
     Base.metadata.create_all(engine)
@@ -141,22 +166,24 @@ def seed_database(db_session: Session):
     test_invoice_1 = Invoice(
         id=1,
         client_id=test_client_1.id,
+        project_id=1,  # Add project_id field
         amount=5000.0,
         issue_date=datetime.now(),
         due_date=datetime.now() + timedelta(days=30),
         status="sent",
-        description="Test invoice 1",
+        notes="Test invoice 1",  # Use notes instead of description
         items='[]'  # JSON string instead of Python list
     )
     
     test_invoice_2 = Invoice(
         id=2,
         client_id=test_client_2.id,
+        project_id=1,  # Add project_id field
         amount=3000.0,
         issue_date=datetime.now(),
         due_date=datetime.now() + timedelta(days=15),
         status="paid",
-        description="Test invoice 2",
+        notes="Test invoice 2",  # Use notes instead of description
         items='[]'  # JSON string instead of Python list
     )
     
@@ -173,8 +200,9 @@ def seed_database(db_session: Session):
         project_id=1,  # Add project_id to avoid validation errors
         amount=3000.0,
         payment_date=datetime.now(),
-        payment_method="credit_card",
-        transaction_id="txn_test_123"
+        method="credit_card",  # Use method instead of payment_method
+        transaction_id="txn_test_123",
+        payment_gateway_id="gw_test_123"  # Add payment_gateway_id field
     )
     
     db_session.add(test_payment_1)
