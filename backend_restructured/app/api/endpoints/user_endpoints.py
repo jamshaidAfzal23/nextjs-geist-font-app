@@ -13,6 +13,7 @@ from ...models.user_model import User
 from ...schemas.user_schemas import (
     UserCreate, UserUpdate, UserResponse, UserListResponse, PasswordChange, UserCreateBulk
 )
+from .user_preference_endpoints import router as user_preferences_router
 
 # Create router for user endpoints with proper prefix
 router = APIRouter()
@@ -21,31 +22,33 @@ router = APIRouter()
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(
     user_data: UserCreate,
-    db: Session = Depends(get_database_session)
+    db: Session = Depends(get_database_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Create a new user account.
+    Create a new user account (admin only).
     """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create users."
+        )
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
     hashed_password = hash_password(user_data.password)
-    
     db_user = User(
         full_name=user_data.full_name,
         email=user_data.email,
         hashed_password=hashed_password,
         role=user_data.role
     )
-    
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
     return db_user
 
 
@@ -357,3 +360,5 @@ async def delete_user_by_id(
     
     db.delete(user)
     db.commit()
+
+router.include_router(user_preferences_router, prefix="/me/preferences", tags=["User Preferences"])

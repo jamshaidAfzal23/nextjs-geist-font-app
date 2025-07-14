@@ -84,6 +84,11 @@ class UserUpdate(BaseModel):
         None,
         description="Updated email address"
     )
+    password: Optional[str] = Field(
+        None,
+        min_length=8,
+        description="Updated password (minimum 8 characters)"
+    )
     role: Optional[str] = Field(
         None,
         description="Updated user role"
@@ -99,7 +104,7 @@ class UserUpdate(BaseModel):
         if v is not None:
             allowed_roles = ['admin', 'manager', 'developer', 'user', 'viewer']
             if v not in allowed_roles:
-                raise ValueError(f'Role must be one of: {", ".join(allowed_roles)}')
+                raise ValueError(f'Role must be one of: {",".join(allowed_roles)}')
         return v
 
 class UserResponse(UserBase):
@@ -183,6 +188,27 @@ class PasswordReset(BaseModel):
         if not any(c.isdigit() for c in v):
             raise ValueError('Password must contain at least one digit')
         return v
+
+class UserPreferences(BaseModel):
+    """
+    Schema for user preferences.
+    """
+    theme: str = Field(
+        default="light",
+        description="UI theme preference"
+    )
+    notifications_enabled: bool = Field(
+        default=True,
+        description="Whether notifications are enabled"
+    )
+    dashboard_layout: str = Field(
+        default="default",
+        description="Dashboard layout preference"
+    )
+    
+    class Config:
+        """Pydantic configuration."""
+        from_attributes = True
 
 class PasswordChange(BaseModel):
     """
