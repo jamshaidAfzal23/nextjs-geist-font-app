@@ -14,7 +14,8 @@ sys.path.append(parent_dir)
 # Now we can import from the app module
 from app.core.database import Base, get_database_session
 from app.models.user_model import User
-from app.core.security import hash_password, create_access_token
+from app.auth.auth import hash_password, create_access_token
+from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.core.database import engine as prod_engine
 
@@ -35,6 +36,13 @@ def engine():
     
     # Drop all tables first to ensure clean state
     Base.metadata.drop_all(bind=test_engine)
+    # Import specific model classes to ensure they're registered
+    from app.models.user_model import User
+    from app.models.client_model import Client
+    from app.models.project_model import Project
+    from app.models.financial_model import Payment, Invoice, Expense
+    from app.models.client_note_model import ClientNote
+    from app.models.client_history_model import ClientHistory
     # Create all tables
     Base.metadata.create_all(bind=test_engine)
     
@@ -78,13 +86,36 @@ def override_dependency(db_session):
             yield db_session
         finally:
             pass  # Session closure is handled by db_session fixture
-
     from main import app
     app.dependency_overrides[get_database_session] = override_get_db
-    yield
-    app.dependency_overrides.clear()
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.dependency_overrides.clear()
 
-@pytest.fixture
+@pytest.fixture(scope="session", autouse=True)
+def create_tables(engine):
+    """Create all tables in the database."""
+    # Import all models to ensure they are registered with Base.metadata
+    from app.models import user_model, client_model, project_model, financial_model
+    from app.models import client_note_model, client_history_model, project_milestone_model
+    from app.models import api_key_model, user_preference_model
+    
+    # Import specific model classes to ensure they're registered
+    from app.models.user_model import User
+    from app.models.client_model import Client
+    from app.models.project_model import Project
+    from app.models.financial_model import Payment, Invoice, Expense
+    from app.models.client_note_model import ClientNote
+    from app.models.client_history_model import ClientHistory
+    
+    # Create all tables
+    Base.metadata.create_all(engine)
+    yield
+    Base.metadata.drop_all(engine)
+
+@pytest.fixture(scope="function")
 def seed_database(db_session: Session):
     """Seed the database with test data."""
     # Create test users
@@ -161,6 +192,57 @@ def seed_database(db_session: Session):
     db_session.commit()
     db_session.refresh(test_client_1)
     db_session.refresh(test_client_2)
+    
+    # Create test financial data
+    from app.models.financial_model import Invoice, Payment
+    from datetime import datetime, timedelta
+    
+    # Create test invoices
+    test_invoice_1 = Invoice(
+        id=1,
+        client_id=test_client_1.id,
+        project_id=1,  # Add project_id field
+        amount=5000.0,
+        issue_date=datetime.now(),
+        due_date=datetime.now() + timedelta(days=30),
+        status="sent",
+        notes="Test invoice 1",  # Use notes instead of description
+        items='[]'  # JSON string instead of Python list
+    )
+    
+    test_invoice_2 = Invoice(
+        id=2,
+        client_id=test_client_2.id,
+        project_id=1,  # Add project_id field
+        amount=3000.0,
+        issue_date=datetime.now(),
+        due_date=datetime.now() + timedelta(days=15),
+        status="paid",
+        notes="Test invoice 2",  # Use notes instead of description
+        items='[]'  # JSON string instead of Python list
+    )
+    
+    db_session.add_all([test_invoice_1, test_invoice_2])
+    db_session.commit()
+    db_session.refresh(test_invoice_1)
+    db_session.refresh(test_invoice_2)
+    
+    # Create test payments
+    test_payment_1 = Payment(
+        id=1,
+        invoice_id=test_invoice_2.id,
+        client_id=test_client_2.id,
+        project_id=1,  # Add project_id to avoid validation errors
+        amount=3000.0,
+        payment_date=datetime.now(),
+        method="credit_card",  # Use method instead of payment_method
+        transaction_id="txn_test_123",
+        payment_gateway_id="gw_test_123"  # Add payment_gateway_id field
+    )
+    
+    db_session.add(test_payment_1)
+    db_session.commit()
+    db_session.refresh(test_payment_1)
     
     return {
         "admin_user": admin_user,
